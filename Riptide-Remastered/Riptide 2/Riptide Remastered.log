@@ -1,0 +1,2 @@
+﻿  Main.cpp
+c:\users\fabia\desktop\fix\riptide-remastered\protobuf\base_gcmessages.pb.h(9): fatal error C1083: Datei (Include) kann nicht geöffnet werden: "google/protobuf/stubs/common.h": No such file or directory

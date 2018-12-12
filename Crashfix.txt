@@ -1,0 +1,3 @@
+Please Inject in Main Menu - Don't Inject Ingame it will probably crash
+
+- Save and loading configs may crash

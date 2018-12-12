@@ -1,0 +1,88 @@
+
+Updated by Baseult:
+Further Updates on https://www.riptide.tk
+
+_________________________________________________________________
+
+Updates since CSGO FREE RELEASE:
+
+- Updated Offsets
+- Updated Hooks
+- Updated Imgui
+- Fixed Ragebot
+- Fixed Aimbot
+- Fixed Smooth
+- Fixed InvisibleCursor
+- Fixed Cvar Loading Crashed
+- Fixed ESP
+- Fixed Protobuf features / Inventorychanger
+- Fixed Crosshair crashes
+- Fixed Further Crashes
+- Added Custom Ragebot Settings
+- Added Custom Aimbot Settings
+
+_________________________________________________________________
+
+Riptide Remastered Changelog
+
++ Adjusted Menu / GUI
++ Added Color Picker
++ Fixed Loading Convars
++ Fixed Crashes
+
+> Hooks = 60% VMT + 40% CVMT
+VMT Hooks aren't detected stop Crying.
+
+Added Ragebot:
++ Aimstep
++ Resolver
++ Override Resolver
++ Silent Aim
++ Fakelag
++ Multi Point
++ Point Scale
++ Hitbox
++ Hit Scan (Head-Neck-Spine-Pelvis-Legs)
++ Auto Wall
++ Hit Chance
++ Min Damage
++ BaimAfterShoots
++ BaimAfterHP
++  Auto Fire
++ Auto Stop
++ Auto Crouch
++ No Recoil
+
+
+Added AntiAim:
++ AAIndicators
++ Pitch
++ RealYaw
++ FakeYaw
+
+Added to Legitbot:
++ pSilent
++ Flash Check
++ Draw Spread
++ RCS Amount x
++ RCS Amount y
+
+Added to ESP:
++ Dlight
++ Damage Indicator
++ Point ESP (Out of view ESP)
++ Defusing
++ InScope
++ Flashed
++ Player Status
+> Updated Grenade Helper
+
+Added to Misc:
++ Anti AFK
++ Telehop
++ Kill Spam
++ Radio Spam
+
+
+
+And much more
