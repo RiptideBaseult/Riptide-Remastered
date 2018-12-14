@@ -49,12 +49,6 @@ namespace Engine
 		Vector			vHitboxHead;
 		Vector			vHitboxHeadScreen;
 
-		Vector			vTriggerHeadPos;
-		Vector			vTriggerChestPos;
-
-		Vector			vAssistTriggerHead;
-		Vector			vAssistTriggerChest;
-
 		Vector			vOrigin;
 		Vector			vOriginScreen;
 
@@ -78,9 +72,6 @@ namespace Engine
 
 		bool			bUpdate;
 		bool			bVisible;
-
-		bool			bAssistFov;
-		bool			bTriggerFov;
 
 		CBaseEntity*	m_pEntity;
 //[/swap_lines]

@@ -149,19 +149,19 @@ void ImGui_ImplDX9_RenderDrawLists(ImDrawData* draw_data)
 		const ImDrawList* cmd_list = draw_data->CmdLists[n];
 		for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
 		{
-			const ImDrawCmd* cmd = &cmd_list->CmdBuffer[cmd_i];
-			if (cmd->UserCallback)
+			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+			if (pcmd->UserCallback)
 			{
-				cmd->UserCallback(cmd_list, cmd);
+				pcmd->UserCallback(cmd_list, pcmd);
 			}
 			else
 			{
-				const RECT r = { (LONG)cmd->ClipRect.x, (LONG)cmd->ClipRect.y, (LONG)cmd->ClipRect.z, (LONG)cmd->ClipRect.w };
-				g_pd3dDevice->SetTexture(0, (LPDIRECT3DTEXTURE9)cmd->TextureId);
+				const RECT r = { (LONG)pcmd->ClipRect.x, (LONG)pcmd->ClipRect.y, (LONG)pcmd->ClipRect.z, (LONG)pcmd->ClipRect.w };
+				g_pd3dDevice->SetTexture(0, (LPDIRECT3DTEXTURE9)pcmd->TextureId);
 				g_pd3dDevice->SetScissorRect(&r);
-				g_pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, vtx_offset, 0, (UINT)cmd_list->VtxBuffer.Size, idx_offset, cmd->ElemCount / 3);
+				g_pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, vtx_offset, 0, (UINT)cmd_list->VtxBuffer.Size, idx_offset, pcmd->ElemCount / 3);
 			}
-			idx_offset += cmd->ElemCount;
+			idx_offset += pcmd->ElemCount;
 		}
 		vtx_offset += cmd_list->VtxBuffer.Size;
 	}
@@ -354,3 +354,174 @@ void ImGui_ImplDX9_NewFrame()
 	// Start the frame
 	ImGui::NewFrame();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

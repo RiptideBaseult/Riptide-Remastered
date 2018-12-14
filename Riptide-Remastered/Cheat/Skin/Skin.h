@@ -14,39 +14,15 @@ namespace Engine
 
 using namespace Engine;
 
-extern int SafeWeaponID();
-extern class Stick_t* Stick;
-#define INVALID_EHANDLE_INDEX 0xFFFFFFFF
-#define STICKERS_COUNT 5
-class Sticker_t
-{
-public:
-	int iID = 0;
-	float flWear = 0.f;
-	float flScale = 1.f;
-	int iRotation = 0;
-};
-class Stick_t
-{
-public:
-	bool StickersEnabled = false;
-	Sticker_t Stickers[STICKERS_COUNT];
-};
-enum class EStickerAttributeType
-{
-	Index,
-	Wear,
-	Scale,
-	Rotation
-};
-
 struct EconomyItemCfg
 {
+	bool LiveStatTrack = false;
 	int iItemDefinitionIndex = 0;
 	int nFallbackPaintKit = 0;
 	int iEntityQuality = 4;
 	int nFallbackStatTrak = -1;
 	float flFallbackWear = 0.00000001f;
+	int nFallbackSeed = 0;
 };
 
 struct WeaponSkins_s
@@ -68,17 +44,17 @@ struct GlovesSkins_s
 	const char* szModel;
 };
 
-extern WeaponSkins_s WeaponSkins[33];
-extern KnifeSkins_s KnifeSkins[10];
+extern WeaponSkins_s WeaponSkins[34];
+extern KnifeSkins_s KnifeSkins[14];
 extern GlovesSkins_s GlovesSkin_Array[49];
 
 extern unordered_map<int , EconomyItemCfg> g_SkinChangerCfg;
 extern unordered_map<int , const char*> g_ViewModelCfg;
 extern unordered_map<const char* , const char*> g_KillIconCfg;
 
-extern char* pWeaponData[33];
-extern int pWeaponItemIndexData[33];
-extern char* pKnifeData[10];
+extern char* pWeaponData[34];
+extern int pWeaponItemIndexData[34];
+extern char* pKnifeData[14];
 
 #define WEAPON_DATA_SIZE ( sizeof( pWeaponData ) / sizeof( *pWeaponData ) )
 #define KNIFE_DATA_SIZE ( sizeof( pKnifeData ) / sizeof( *pKnifeData ) )
@@ -125,30 +101,30 @@ void Hook_SetViewModelSequence( const CRecvProxyData *pDataConst , void *pStruct
 
 // ƒ–Œ¡Œ¬» » , ¿¬“ŒÃ¿“€
 
-#define WEAPON_AK47_STR		"ak47"				// 10
-#define WEAPON_AUG_STR		"aug"				// 11
-#define WEAPON_FAMAS_STR	"famas"				// 12
-#define WEAPON_GALILAR_STR	"galilar"			// 13
-#define WEAPON_M249_STR		"m249"				// 14
-#define WEAPON_M4A1_STR		"m4a1"				// 15
-#define WEAPON_M4A1_S_STR	"m4a1_silencer"		// 16
-#define WEAPON_MAC10_STR	"mac10"				// 17
-#define WEAPON_P90_STR		"p90"				// 18
-#define WEAPON_UMP45_STR	"ump45"				// 19
-#define WEAPON_XM1014_STR	"xm1014"			// 20
-#define WEAPON_BIZON_STR	"bizon"				// 21
-#define WEAPON_MAG7_STR		"mag7"				// 22
-#define WEAPON_NEGEV_STR	"negev"				// 23
-#define WEAPON_SAWEDOFF_STR	"sawedoff"			// 24
-#define WEAPON_MP7_STR		"mp7"				// 25
-#define WEAPON_MP9_STR		"mp9"				// 26
-#define WEAPON_NOVA_STR		"nova"				// 27
-#define WEAPON_SG553_STR	"sg556"				// 28
-
-#define WEAPON_G3SG1_STR	"g3sg1"				// 29
-#define WEAPON_SCAR20_STR	"scar20"			// 30
+#define WEAPON_AK47_STR        "ak47"                // 10
+#define WEAPON_AUG_STR        "aug"                  // 11
+#define WEAPON_FAMAS_STR    "famas"                  // 12
+#define WEAPON_GALILAR_STR    "galilar"              // 13
+#define WEAPON_M249_STR        "m249"                // 14
+#define WEAPON_M4A4_STR        "m4a1"                // 15
+#define WEAPON_M4A1_S_STR    "m4a1_silencer"         // 16
+#define WEAPON_MAC10_STR    "mac10"                  // 17
+#define WEAPON_P90_STR        "p90"                  // 18
+#define WEAPON_MP5_STR        "mp5sd"                // 19
+#define WEAPON_UMP45_STR    "ump45"                  // 20
+#define WEAPON_XM1014_STR    "xm1014"                // 21
+#define WEAPON_BIZON_STR    "bizon"                  // 22
+#define WEAPON_MAG7_STR        "mag7"                // 23
+#define WEAPON_NEGEV_STR    "negev"                  // 24
+#define WEAPON_SAWEDOFF_STR    "sawedoff"            // 25
+#define WEAPON_MP7_STR        "mp7"                  // 26
+#define WEAPON_MP9_STR        "mp9"                  // 27
+#define WEAPON_NOVA_STR        "nova"                // 28
+#define WEAPON_SG556_STR    "sg556"                  // 29
+#define WEAPON_G3SG1_STR    "g3sg1"                  // 30
+#define WEAPON_SCAR20_STR    "scar20"                // 31
 
 // —Õ¿…œ≈– »
 
-#define WEAPON_AWP_STR		"awp"				// 31
-#define WEAPON_SSG08_STR	"ssg08"				// 32
+#define WEAPON_AWP_STR		"awp"				// 32
+#define WEAPON_SSG08_STR	"ssg08"				// 33

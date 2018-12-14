@@ -9,6 +9,7 @@
 #include "Offset.h"
 #include "Render.h"
 #include "Players.h"
+#include "../SDK/SDK.h"
 
 //[enc_string_enable /]
 
@@ -30,18 +31,30 @@
 
 typedef void( *LPSEARCHFUNC )( LPCTSTR lpszFileName );
 
+template<typename... Args> extern void PrintToConsole(const char* format, Args... args)
+{
+	float watermarkRainbowSpeed = 0.005f;
+	static float rainbow;
+	rainbow += watermarkRainbowSpeed;
+	if (rainbow > 1.f) rainbow = 0.f;
+	Interfaces::GetConVar()->ConsoleColorPrintf(Color::FromHSB(rainbow, 1.f, 1.f), "ChampionWare:");
+	Interfaces::GetConVar()->ConsolePrintf(format, args...);
+	Interfaces::GetConVar()->ConsolePrintf("\n");
+};
+template<class T, class U> T clampMinMax(T in, U low, U high)
+{
+	if (in <= low)
+		return low;
+	if (in >= high)
+		return high;
+	return in;
+}
+
 namespace Engine
 {
 	enum WEAPON_TYPE;
 //[swap_lines]
 	bool		Initialize();
-	void NormalizeAngles(QAngle & angles);
-	void ClampAngles(QAngle & angles);
-	void CorrectMovement(QAngle vOldAngles, CUserCmd * cmd, float fOldForward, float fOldSidemove);
-	extern bool bSendPacket;
-	void		ClanTag();
-	void		ChatSpamRegular();
-	void		ChatSpamRandom();
 	void		Shutdown();
 	WEAPON_TYPE GetWeaponType( int iItemDefinitionIndex );
 	bool		IsLocalAlive();
@@ -51,7 +64,6 @@ namespace Engine
 	bool		WorldToScreen( const Vector& vOrigin , Vector& vScreen );
 	bool		GetVisibleOrigin( const Vector& vOrigin );
 	void		AngleVectors( const Vector &vAngles , Vector& vForward );
-	void AngleVectors2(const Vector &angles, Vector *forward, Vector *right, Vector *up);
 	void		VectorAngles( const Vector vForward , Vector& vAngle );
 	void		AngleNormalize( Vector& vAngles );
 	void		SmoothAngles( Vector MyViewAngles , Vector AimAngles , Vector &OutAngles , float Smoothing );
@@ -62,7 +74,6 @@ namespace Engine
 	IMaterial*	CreateMaterial( bool bFlat , bool bShouldIgnoreZ );
 	void		ForceMaterial( Color color , IMaterial* material , bool useColor = true , bool forceMaterial = true );
 	BOOL SearchFiles( LPCTSTR lpszFileName , LPSEARCHFUNC lpSearchFunc , BOOL bInnerFolders );
-	void        ClanTagApply(const char* TagName);
 //[/swap_lines]
 }
 

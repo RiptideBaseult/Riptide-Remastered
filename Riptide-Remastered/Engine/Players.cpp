@@ -137,32 +137,20 @@ namespace Engine
 			CBaseEntity* pEntity = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(EntIndex);
 
 			if (!pEntity || !pEntity->IsPlayer() || !pEntity->IsValid() || pEntity == m_pMe->m_pEntity
-				|| EntIndex == m_pMe->iIndex /*|| pEntity->GetClientClass()->m_ClassID != (int)CLIENT_CLASS_ID::CCSPlayer*/)
+				|| EntIndex == m_pMe->iIndex || pEntity->GetClientClass()->m_ClassID != (int)CLIENT_CLASS_ID::CCSPlayer)
 			{
 				m_pPlayers[EntIndex].bUpdate = false;
-				m_pPlayers[EntIndex].bTriggerFov = false;
 				continue;
 			}
 
 			Vector vHead = pEntity->GetHitboxPosition(HITBOX_HEAD);
 			Vector vOrigin = pEntity->GetRenderOrigin();
 
-			if (vHead.IsZero() || vOrigin.IsZero())
-			{
-				m_pPlayers[EntIndex].bTriggerFov = false;
-				continue;
-			}
-
 			if (Client::g_pEsp)
 			{
 				vHead.z += Settings::Esp::esp_Size;
 				vOrigin.z -= Settings::Esp::esp_Size;
 			}
-
-			Vector vTriggerHead, vTriggerHeadPos, vTriggerChest, vTriggerChestPos;
-
-			vTriggerHead = pEntity->GetHitboxPosition(HITBOX_HEAD);
-			vTriggerChest = pEntity->GetHitboxPosition(HITBOX_BODY);
 
 			if (WorldToScreen(vHead, m_pPlayers[EntIndex].vHitboxHeadScreen) &&
 				WorldToScreen(vOrigin, m_pPlayers[EntIndex].vOriginScreen))
@@ -176,41 +164,6 @@ namespace Engine
 				m_pPlayers[EntIndex].vOriginScreen = Vector(0, 0, 0);
 			}
 
-
-			if (WorldToScreen(vTriggerHead, vTriggerHeadPos))
-			{
-				m_pPlayers[EntIndex].vTriggerHeadPos = vTriggerHeadPos;
-			}
-			else
-			{
-				m_pPlayers[EntIndex].vTriggerHeadPos = Vector(0, 0, 0);
-			}
-
-			if (WorldToScreen(vTriggerChest, vTriggerChestPos))
-			{
-				m_pPlayers[EntIndex].vTriggerChestPos = vTriggerChestPos;
-			}
-			else
-			{
-				m_pPlayers[EntIndex].vTriggerChestPos = Vector(0, 0, 0);
-			}
-
-			if (m_pPlayers[EntIndex].vTriggerHeadPos.x > 0.f)
-			{
-				m_pPlayers[EntIndex].fDistanceHead = DistanceScreen(Client::g_vCenterScreen, Vector2D(m_pPlayers[EntIndex].vTriggerHeadPos.x, m_pPlayers[EntIndex].vTriggerHeadPos.y));
-			}
-			else
-			{
-				m_pPlayers[EntIndex].fDistanceHead = 0.f;
-			}
-			if (m_pPlayers[EntIndex].vTriggerChestPos.x > 0.f)
-			{
-				m_pPlayers[EntIndex].fDistanceChest = DistanceScreen(Client::g_vCenterScreen, Vector2D(m_pPlayers[EntIndex].vTriggerChestPos.x, m_pPlayers[EntIndex].vTriggerChestPos.y));
-			}
-			else
-			{
-				m_pPlayers[EntIndex].fDistanceChest = 0.f;
-			}
 
 			if (Client::g_pEsp && Settings::Esp::esp_Skeleton && m_pMe->bAlive)
 			{
@@ -240,6 +193,36 @@ namespace Engine
 				GetHitBoxSkeleton(HITBOX_CHEST, HITBOX_RIGHT_UPPER_ARM, pEntity, m_pPlayers[EntIndex].vHitboxSkeletonArray[14]);
 				GetHitBoxSkeleton(HITBOX_RIGHT_UPPER_ARM, HITBOX_RIGHT_FOREARM, pEntity, m_pPlayers[EntIndex].vHitboxSkeletonArray[15]);
 				GetHitBoxSkeleton(HITBOX_RIGHT_FOREARM, HITBOX_RIGHT_HAND, pEntity, m_pPlayers[EntIndex].vHitboxSkeletonArray[16]);
+			}
+
+			if (Client::g_pEsp && Settings::Esp::esp_BulletTrace)
+			{
+				Vector vScr, vDst, vForward, vScrScreen, vDstScreen;
+
+				trace_t tr;
+				Ray_t ray;
+				CTraceFilter filter;
+
+				AngleVectors(pEntity->GetRenderAngles(), vForward);
+				filter.pSkip = pEntity;
+
+				vScr = pEntity->GetHitboxPosition(HITBOX_HEAD);
+				vDst = vScr + (vForward * (float)Settings::Esp::esp_BulletTrace);
+
+				ray.Init(vScr, vDst);
+
+				Interfaces::EngineTrace()->TraceRay(ray, MASK_SHOT, &filter, &tr);
+
+				if (!WorldToScreen(vScr, vScrScreen) || !WorldToScreen(tr.endpos, vDstScreen))
+				{
+					m_pPlayers[EntIndex].vBulletTraceArray[0] = Vector(0, 0, 0);
+					m_pPlayers[EntIndex].vBulletTraceArray[1] = Vector(0, 0, 0);
+				}
+				else
+				{
+					m_pPlayers[EntIndex].vBulletTraceArray[0] = vScrScreen;
+					m_pPlayers[EntIndex].vBulletTraceArray[1] = vDstScreen;
+				}
 			}
 
 			m_pPlayers[EntIndex].Name = pEntity->GetPlayerName();
@@ -291,3 +274,174 @@ namespace Engine
 		vOut[1] = pEntity->GetHitboxPosition(nHitBoxTwo);
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

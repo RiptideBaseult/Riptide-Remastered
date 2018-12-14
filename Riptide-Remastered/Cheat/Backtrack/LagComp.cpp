@@ -19,7 +19,7 @@ bool BackTrack::IsTickValid(int tick)
 void BackTrack::UpdateRecord(int i)
 {
 	CBaseEntity* pEntity = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(i);
-	if (pEntity && !pEntity->IsDead() /*&& !pEntity->IsDormant()*/)
+	if (pEntity && !pEntity->IsDead() && !pEntity->IsDormant())
 	{
 		float lby = pEntity->GetLowerBodyYaw();
 		if (lby != records[i].lby)
@@ -70,8 +70,8 @@ void BackTrack::legitBackTrack(CUserCmd* cmd)
 			if (!Interfaces::Engine()->GetPlayerInfo(i, &info))
 				continue;
 
-			/*if (entity->IsDormant())
-				continue;*/
+			if (entity->IsDormant())
+				continue;
 
 			if (entity->GetTeam() == pLocal->GetTeam())
 				continue;

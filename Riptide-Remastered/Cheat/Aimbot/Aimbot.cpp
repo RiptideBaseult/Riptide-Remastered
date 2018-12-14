@@ -5,16 +5,59 @@ using namespace Client;
 #pragma warning(disable:4244)
 //[junk_enable /]
 //[enc_string_enable /]
-byte tt_ct_best_hit_1[6] =
+byte tt_ct_best_hit_1[14] =
 {
-	HITBOX_HEAD,
-	HITBOX_NECK,
-	HITBOX_BODY,
-	HITBOX_THORAX,
-	HITBOX_CHEST,
+	//All Spots
+	HITBOX_HEAD ,
+	HITBOX_NECK ,
+	HITBOX_BODY ,
+	HITBOX_THORAX ,
+	HITBOX_CHEST ,
+	HITBOX_RIGHT_THIGH ,
+	HITBOX_LEFT_THIGH ,
+	HITBOX_RIGHT_HAND ,
+	HITBOX_LEFT_HAND ,
+	HITBOX_RIGHT_UPPER_ARM ,
+	HITBOX_RIGHT_FOREARM ,
+	HITBOX_LEFT_UPPER_ARM ,
+	HITBOX_LEFT_FOREARM
 };
 
-#define TT_CT_BEST_HIT_SIZE_1 ( sizeof( tt_ct_best_hit_1 ) / sizeof( *tt_ct_best_hit_1 ) )
+byte tt_ct_best_hit_2[13] =
+{
+	//No Headshot
+	HITBOX_NECK ,
+	HITBOX_BODY ,
+	HITBOX_THORAX ,
+	HITBOX_CHEST ,
+	HITBOX_RIGHT_THIGH ,
+	HITBOX_LEFT_THIGH ,
+	HITBOX_RIGHT_HAND ,
+	HITBOX_LEFT_HAND ,
+	HITBOX_RIGHT_UPPER_ARM ,
+	HITBOX_RIGHT_FOREARM ,
+	HITBOX_LEFT_UPPER_ARM ,
+	HITBOX_LEFT_FOREARM
+};
+
+byte tt_ct_best_hit_3[6] =
+{
+	//No Arms/Legs
+	HITBOX_HEAD ,
+	HITBOX_NECK ,
+	HITBOX_BODY ,
+	HITBOX_THORAX ,
+	HITBOX_CHEST
+};
+
+byte tt_ct_best_hit_4[5] =
+{
+	//No Arms/Legs/Neck
+	HITBOX_HEAD ,
+	HITBOX_BODY ,
+	HITBOX_THORAX ,
+	HITBOX_CHEST
+};
 
 CAimbot::CAimbot()
 {
@@ -40,7 +83,7 @@ CAimbot::CAimbot()
 
 bool CAimbot::IsEnable()
 {
-	if (!m_pLocal || !m_cmd)
+	if (!m_pLocal || !m_pCmd)
 		return false;
 
 	CBaseEntity* localplayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
@@ -48,13 +91,16 @@ bool CAimbot::IsEnable()
 	if (!Settings::Aimbot::aim_Active)
 		return false;
 
+	if (!Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Active)
+		return false;
+
 	if (!m_pLocal->WeaponAmmo || m_pLocal->bInReload)
 		return false;
 
 	if (m_pLocal->WeaponType > WEAPON_TYPE_SNIPER)
-		return false;
+		return false;	
 
-	if (Settings::Aimbot::aim_KillDelay && (Settings::Misc::KillDelayBool2 || Interfaces::GlobalVars()->curtime <= Settings::Misc::KillDelayVar))
+	if (Settings::Aimbot::aim_KillDelay && (Settings::Misc::KillDelayBool2 || Interfaces::GlobalVars()->tickcount <= Settings::Misc::KillDelayVar))
 		return false;
 
 	if (Settings::Aimbot::aim_OnKey && !GetAsyncKeyState(Settings::Aimbot::aim_Key))
@@ -69,9 +115,6 @@ bool CAimbot::IsEnable()
 			return false;
 	}
 
-
-
-
 	return true;
 }
 
@@ -84,13 +127,9 @@ int CAimbot::GetPlayerFov(CPlayer * pPlayer)
 	{
 		iFovVal = Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov;
 	}
-	else if (!Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_pSilent)
+	else
 	{
 		iFovVal = Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov;
-	}
-	else if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_pSilent)
-	{
-		iFovVal = Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_pSilentFov;
 	}
 
 	int base_fov = pow(iFovVal + FIX_MIN_FOV_HEAD, 2) * 90;
@@ -173,7 +212,74 @@ int CAimbot::GetBestHitBox()
 	{
 		if (m_lBestHitbox == -1)
 		{
-			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit >= 1)
+
+			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit >= 4)
+			{
+				for (byte bHitbox = 0; bHitbox < TT_CT_BEST_HIT_SIZE_4; bHitbox++)
+				{
+					Vector vHitBox = pPlayer->m_pEntity->GetHitboxPosition(tt_ct_best_hit_4[bHitbox]);
+					Vector vHitBoxScreen;
+
+					if (!WorldToScreen(vHitBox, vHitBoxScreen))
+						continue;
+
+					Vector2D vHitboxSrc = Vector2D(vHitBoxScreen.x, vHitBoxScreen.y);
+
+					float fDistanceScreen = DistanceScreen(g_vCenterScreen, vHitboxSrc);
+
+					if (fDistanceScreen < ScreenDistanceBase)
+					{
+						ScreenDistanceBase = fDistanceScreen;
+						m_lBestHitbox = tt_ct_best_hit_4[bHitbox];
+					}
+				}
+			}
+
+			else if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit >= 3)
+			{
+				for (byte bHitbox = 0; bHitbox < TT_CT_BEST_HIT_SIZE_3; bHitbox++)
+				{
+					Vector vHitBox = pPlayer->m_pEntity->GetHitboxPosition(tt_ct_best_hit_3[bHitbox]);
+					Vector vHitBoxScreen;
+
+					if (!WorldToScreen(vHitBox, vHitBoxScreen))
+						continue;
+
+					Vector2D vHitboxSrc = Vector2D(vHitBoxScreen.x, vHitBoxScreen.y);
+
+					float fDistanceScreen = DistanceScreen(g_vCenterScreen, vHitboxSrc);
+
+					if (fDistanceScreen < ScreenDistanceBase)
+					{
+						ScreenDistanceBase = fDistanceScreen;
+						m_lBestHitbox = tt_ct_best_hit_3[bHitbox];
+					}
+				}
+			}
+
+			else if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit >= 2)
+			{
+				for (byte bHitbox = 0; bHitbox < TT_CT_BEST_HIT_SIZE_2; bHitbox++)
+				{
+					Vector vHitBox = pPlayer->m_pEntity->GetHitboxPosition(tt_ct_best_hit_2[bHitbox]);
+					Vector vHitBoxScreen;
+
+					if (!WorldToScreen(vHitBox, vHitBoxScreen))
+						continue;
+
+					Vector2D vHitboxSrc = Vector2D(vHitBoxScreen.x, vHitBoxScreen.y);
+
+					float fDistanceScreen = DistanceScreen(g_vCenterScreen, vHitboxSrc);
+
+					if (fDistanceScreen < ScreenDistanceBase)
+					{
+						ScreenDistanceBase = fDistanceScreen;
+						m_lBestHitbox = tt_ct_best_hit_2[bHitbox];
+					}
+				}
+			}
+
+			else if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit >= 1)
 			{
 				for (byte bHitbox = 0; bHitbox < TT_CT_BEST_HIT_SIZE_1; bHitbox++)
 				{
@@ -194,6 +300,7 @@ int CAimbot::GetBestHitBox()
 					}
 				}
 			}
+
 			else
 			{
 				m_lBestHitbox = tt_ct_best_hit_1[Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot];
@@ -238,55 +345,37 @@ void CAimbot::OnRender()
 	{
 		int iPlayerFov = GetPlayerFov(pTargetPlayer);
 
-		Color TargetFovColor = g_pEsp->GetPlayerColor(pTargetPlayer);
+		Color EspVisibleColor = g_pEsp->GetPlayerVisibleColor(pTargetPlayer);
 
-		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType <= 0)
+		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType == 0)
 		{
-			g_pRender->Circle(Vector2D(g_vCenterScreen.x, g_vCenterScreen.y), 150, iPlayerFov, Color::White());
+			g_pRender->DrawOutlineBox(m_vAimBestHitboxScreen.x - iPlayerFov, m_vAimBestHitboxScreen.y - iPlayerFov,
+				iPlayerFov * 2, iPlayerFov * 2, 
+				Color(int(Settings::Aimbot::aim_FovColor[0] * 255.f),
+					int(Settings::Aimbot::aim_FovColor[1] * 255.f),
+					int(Settings::Aimbot::aim_FovColor[2] * 255.f)));
 		}
-		else
+
+		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType == 1)
 		{
-			g_pRender->Circle(Vector2D(g_vCenterScreen.x, g_vCenterScreen.y), 150, iPlayerFov, Color::White());
+			g_pRender->DrawOutlineBox(g_vCenterScreen.x - iPlayerFov, g_vCenterScreen.y - iPlayerFov, iPlayerFov * 2, iPlayerFov * 2, 
+				Color(int(Settings::Aimbot::aim_FovColor[0] * 255.f),
+				int(Settings::Aimbot::aim_FovColor[1] * 255.f),
+				int(Settings::Aimbot::aim_FovColor[2] * 255.f)));
 		}
 	}
 
 }
 
-void CAimbot::OnEvents(IGameEvent* pEvent)
-{
-	if (!strcmp(pEvent->GetName(), "player_death"))
-	{
-		if (Interfaces::Engine()->GetPlayerForUserID(pEvent->GetInt("attacker")) == Interfaces::Engine()->GetLocalPlayer())
-		{
-			if (Settings::Aimbot::aim_KillDelayTime == 0)
-			{
-				Settings::Misc::KillDelayBool2 = false;
-			}
-			else
-			{
-				Settings::Misc::KillDelayVar = Interfaces::GlobalVars()->curtime + Settings::Aimbot::aim_KillDelayTime;
-			}
-		}
-	}
-	if (!strcmp(pEvent->GetName(), "game_newmap"))
-	{
-		Settings::Misc::KillDelayBool2 = false;
-		Settings::Aimbot::aim_KillDelayTime = 0;
-	}
-}
-
-void CAimbot::Aimbot(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
+void CAimbot::Aimbot()
 {
 	m_bAimShot = false;
 	m_bTargetFov = false;
 
-
 	if (!IsEnable())
 		return;
 
-
-
-	m_bAttack = (m_cmd->buttons & IN_ATTACK);
+	m_bAttack = (m_pCmd->buttons & IN_ATTACK);
 
 	if (!g_pPlayers->GetPlayer(m_iBestTarget)->bUpdate)
 	{
@@ -323,7 +412,6 @@ void CAimbot::Aimbot(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
 	if (m_iBestHitbox == -1)
 		return;
 
-
 	CPlayer* pPreTargetPlayer = g_pPlayers->GetPlayer(m_iBestPreTarget);
 	CPlayer* pTargetPlayer = g_pPlayers->GetPlayer(m_iBestTarget);
 
@@ -342,9 +430,6 @@ void CAimbot::Aimbot(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
 		bLockAttack = false;
 		m_pShotDelay->reset();
 	}
-
-	if (Settings::Aimbot::aim_Crouch)
-		m_cmd->buttons |= IN_DUCK;
 
 	if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_AutoPistol && m_pLocal->WeaponType == WEAPON_TYPE_PISTOL)
 	{
@@ -497,21 +582,21 @@ void CAimbot::Aimbot(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
 			m_bAimShot = true;
 		}
 
+
 		if (m_bClamp)
 		{
-
-			AimbotSet(cmd, pLocal, bSendPacket);
+			AimbotSet();
 		}
 
 		if (m_pLocal->WeaponType == WEAPON_TYPE_SHOTGUN || !Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_AutoPistol)
 		{
 			if (m_bAimShot)
 			{
-				m_cmd->buttons |= IN_ATTACK;
+				m_pCmd->buttons |= IN_ATTACK;
 			}
 			else
 			{
-				m_cmd->buttons &= ~IN_ATTACK;
+				m_pCmd->buttons &= ~IN_ATTACK;
 			}
 		}
 
@@ -519,16 +604,16 @@ void CAimbot::Aimbot(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
 		{
 			if (m_bAimShot)
 			{
-				m_cmd->buttons |= IN_ATTACK;
+				m_pCmd->buttons |= IN_ATTACK;
 				m_bAutoPistolEn = false;
 			}
 			else
-				m_cmd->buttons &= ~IN_ATTACK;
+				m_pCmd->buttons &= ~IN_ATTACK;
 		}
 	}
 }
 
-void CAimbot::AimbotSet(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
+void CAimbot::AimbotSet()
 {
 	if (!m_vAimBestHitbox.IsValid())
 		return;
@@ -537,60 +622,65 @@ void CAimbot::AimbotSet(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
 
 	VectorAngles(m_vAimBestHitbox - m_pLocal->vEyeOrigin, vAimAngle);
 
-	if (m_bClamp)
-	{
-		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_pSilent == 1)
-		{
-			QAngle oldView = cmd->viewangles;
-			float oldSidemove = cmd->sidemove;
-			float oldForwardmove = cmd->forwardmove;
-
-			float flServerTime = pLocal->m_pEntity->GetTickBase() * Interfaces::GlobalVars()->interval_per_tick;
-			float flNextPrimaryAttack = pLocal->m_pWeaponEntity->GetNextPrimaryAttack();
-
-			bool bBulletTime = true;
-			if (flNextPrimaryAttack > flServerTime)
-				bBulletTime = false;
-
-			if (m_cmd->buttons & IN_ATTACK) {
-				bSendPacket = false;
-			}
-			else {
-				bSendPacket = true;
-				cmd->viewangles = oldView;
-				cmd->sidemove = oldSidemove;
-				cmd->forwardmove = oldForwardmove;
-			}
-
-			Interfaces::Engine()->SetViewAngles(cmd->viewangles);
-		}
-	}
-
 	bool bEnableRcs = false;
 
-	if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx && Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy)
+	if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType <= 0)
 	{
-		if (m_pLocal->WeaponType == WEAPON_TYPE_SHOTGUN && m_pLocal->iShotsFired > int(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsAfterXShot))
-			bEnableRcs = true;
+		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcs)
+		{
+			if (m_pLocal->WeaponType == WEAPON_TYPE_SHOTGUN && m_pLocal->iShotsFired > 1)
+				bEnableRcs = true;
 
-		if (m_pLocal->WeaponType == WEAPON_TYPE_PISTOL && m_pLocal->iShotsFired <= int(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsAfterXShot))
-			bEnableRcs = true;
+			if (m_pLocal->WeaponType == WEAPON_TYPE_PISTOL && m_pLocal->iShotsFired <= 1)
+				bEnableRcs = true;
+		}
+	}
+	else if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType >= 1)
+	{
+		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx && Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy)
+		{
+			if (m_pLocal->WeaponType == WEAPON_TYPE_SHOTGUN && m_pLocal->iShotsFired > int(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsAfterXShot))
+				bEnableRcs = true;
+
+			if (m_pLocal->WeaponType == WEAPON_TYPE_PISTOL && m_pLocal->iShotsFired <= int(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsAfterXShot))
+				bEnableRcs = true;
+		}
 	}
 
 	if (bEnableRcs)
 	{
-		if (Settings::Aimbot::aim_RcsType == 0)
+		if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType <= 0)
 		{
-			vAimAngle -= m_pLocal->vAimPunch * Vector(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx * 0.0221521f, Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy * 0.0221521f, 1);
+			float MulVar = Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcs * 0.02f;
+			if (Settings::Aimbot::aim_RcsType <= 0)
+			{
+				vAimAngle -= m_pLocal->vAimPunch * MulVar;
+			}
+			else if (Settings::Aimbot::aim_RcsType == 1)
+			{
+				vAimAngle -= (m_pLocal->vPunch + m_pLocal->vAimPunch) * MulVar;
+			}
+			else if (Settings::Aimbot::aim_RcsType >= 2)
+			{
+				vAimAngle -= (m_pLocal->vPunch + (m_pLocal->vAimPunch * 2 * 0.5f)) * MulVar;
+			}
 		}
-		else if (Settings::Aimbot::aim_RcsType == 1)
+		else if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType >= 1)
 		{
-			vAimAngle -= (m_pLocal->vPunch + m_pLocal->vAimPunch) * Vector(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx * 0.0221521f, Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy * 0.0221521f, 1);
+			if (Settings::Aimbot::aim_RcsType == 0)
+			{
+				vAimAngle -= m_pLocal->vAimPunch * Vector(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx * 0.0221521f, Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy * 0.0221521f, 1);
+			}
+			else if (Settings::Aimbot::aim_RcsType == 1)
+			{
+				vAimAngle -= (m_pLocal->vPunch + m_pLocal->vAimPunch) * Vector(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx * 0.0221521f, Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy * 0.0221521f, 1);
+			}
+			else if (Settings::Aimbot::aim_RcsType == 2)
+			{
+				vAimAngle -= (m_pLocal->vPunch + (m_pLocal->vAimPunch * 2 * 0.5f)) * Vector(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx * 0.0221521f, Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy * 0.0221521f, 1);
+			}
 		}
-		else if (Settings::Aimbot::aim_RcsType == 2)
-		{
-			vAimAngle -= (m_pLocal->vPunch + (m_pLocal->vAimPunch * 2 * 0.5f)) * Vector(Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx * 0.0221521f, Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy * 0.0221521f, 1);
-		}
+
 	}
 
 	float fSmooth = 10.f;
@@ -611,9 +701,9 @@ void CAimbot::AimbotSet(CUserCmd * cmd, CMe * pLocal, bool &bSendPacket)
 
 	fSmooth = fSmooth / 10.f;
 
-	SmoothAngles(m_cmd->viewangles, vAimAngle, vSmoothAimAngle, fSmooth);
+	SmoothAngles(m_pCmd->viewangles, vAimAngle, vSmoothAimAngle, fSmooth);
 
-	m_cmd->viewangles = vSmoothAimAngle;
+	m_pCmd->viewangles = vSmoothAimAngle;
 }
 
 void CAimbot::AutoPistol()
@@ -626,264 +716,41 @@ void CAimbot::AutoPistol()
 
 	if (*m_pLocal->m_pWeaponEntity->GeteAttributableItem()->GetItemDefinitionIndex() == WEAPON_REVOLVER)
 	{
-		m_cmd->buttons &= ~IN_ATTACK2;
+		m_pCmd->buttons &= ~IN_ATTACK2;
 	}
 	else
 	{
-		m_cmd->buttons &= ~IN_ATTACK;
+		m_pCmd->buttons &= ~IN_ATTACK;
 	}
 }
 
-void CAimbot::OnCreateMove(CUserCmd * cmd, CMe * pLocal)
+void CAimbot::KillDelay(IGameEvent* pEvent)
 {
-	m_pLocal = pLocal;
-	m_cmd = cmd;
-	PDWORD pEBP;
-	__asm mov pEBP, ebp;
-	bool& bSendPacket = *(bool*)(*pEBP - 0x1C);
-	Aimbot(cmd, pLocal, bSendPacket);
-
-
-	CBaseEntity* pPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
-
-	if (Settings::Aimbot::aim_FastZoom)
+	if (!strcmp(pEvent->GetName(), "player_death"))
 	{
-		if (cmd->buttons & IN_ATTACK)
+		if (Interfaces::Engine()->GetPlayerForUserID(pEvent->GetInt("attacker")) == Interfaces::Engine()->GetLocalPlayer())
 		{
-			if (pLocal->WeaponType == WEAPON_TYPE_SNIPER)
+			if (Settings::Aimbot::aim_KillDelayTime == 0)
 			{
-				if (pPlayer->GetIsScoped())
-				{
-					cmd->buttons &= ~IN_ATTACK;
-					cmd->buttons |= IN_ZOOM;
-				}
+				Settings::Misc::KillDelayBool2 = false;
+			}
+			else
+			{
+				Settings::Misc::KillDelayVar = Interfaces::GlobalVars()->tickcount + Settings::Aimbot::aim_KillDelayTime;
 			}
 		}
 	}
-}
-
-#define M_PHI 1.618033988749895
-void CAimbot::DoAntiAimX(int AntiAim, QAngle& angles)
-{
-	switch (AntiAim)
+	if (!strcmp(pEvent->GetName(), "game_newmap"))
 	{
-	case 0: // AA_NONE
-		angles.x += 0.f;
-		break;
-	case 1:
-		angles.x = 89.f;
-		break;
-	case 2:
-		angles.x = -89.f;
-		break;
-	case 3:
-		angles.x = 0.f;
-		break;
+		Settings::Misc::KillDelayBool2 = false;
+		Settings::Aimbot::aim_KillDelayTime;
 	}
 }
 
-void CAimbot::DoAntiAimY(int AntiAim, QAngle& angles)
+void CAimbot::OnCreateMove(CUserCmd * pCmd, CMe * pLocal)
 {
-	static int jitterangle = 0;
-	int maxJitter;
-	int random;
-	float temp;
-	static bool bFlip;
+	m_pLocal = pLocal;
+	m_pCmd = pCmd;
 
-	switch (AntiAim)
-	{
-	case 0:
-		break;
-
-	case 1:
-		angles.y = fmodf(Interfaces::GlobalVars()->curtime * 360.0 / M_PHI, 360.0);
-		break;
-
-	case 2:
-		angles.y += 180.f;
-		break;
-
-	case 3:
-		angles.y += 90.f;
-		break;
-
-	case 4:
-		angles.y -= 90.f;
-		break;
-
-	case 5:
-		angles.y += 0;
-		break;
-
-	case 6:
-	{
-		angles.y += jitterangle;
-		if (bSendPacket)
-			jitterangle += 135;
-		break;
-	}
-
-	case 7:
-	{
-
-		if (jitterangle <= 1)
-		{
-			angles.y += 90;
-		}
-		else if (jitterangle > 1 && jitterangle <= 3)
-		{
-			angles.y -= 90;
-		}
-
-		int re = rand() % 4 + 1;
-
-
-		if (jitterangle <= 1)
-		{
-			if (re == 4)
-				angles.y += 180;
-			jitterangle += 1;
-		}
-		else if (jitterangle > 1 && jitterangle <= 3)
-		{
-			if (re == 4)
-				angles.y -= 180;
-			jitterangle += 1;
-		}
-		else
-		{
-			jitterangle = 0;
-		}
-		break;
-	}
-
-	case 8:
-		angles.y -= 180;
-		random = rand() % 100;
-		maxJitter = rand() % (85 - 70 + 1) + 70;
-		temp = maxJitter - (rand() % maxJitter);
-		if (random < 35 + (rand() % 15))
-			angles.y -= temp;
-		else if (random < 85 + (rand() % 15))
-			angles.y += temp;
-		break;
-
-	case 9:
-	{
-		static int YawMode = 0;
-		angles.y -= ((bFlip ? 60.f : -60.f) * ((bSendPacket) ? 1.f : -1.f)) - (YawMode == 4 ? 180.f : 0.f);
-		YawMode++;
-		if (YawMode >= 5)
-			YawMode = 0;
-
-	}break;
-	}
-}
-
-void CAimbot::AntiAimCreateMove(CUserCmd* cmd, bool& bSendPacket)
-{
-	if (!(Settings::Ragebot::AAEnabled))
-		return;
-
-	CBaseEntity* pLocalPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
-
-	if (m_pLocal->WeaponType == WEAPON_TYPE_GRENADE)
-		return;
-
-
-
-
-	if ((cmd->buttons & IN_USE) || enum MoveType_t() & (MOVETYPE_LADDER) || cmd->buttons & IN_ATTACK || cmd->buttons & IN_ATTACK2)
-		return;
-
-	if (!Interfaces::Engine()->IsInGame() || !pLocalPlayer || pLocalPlayer->IsDead())
-	{
-		NormalizeAngles(cmd->viewangles);
-		return;
-	}
-
-	static bool bFlip;
-
-
-	QAngle angles = cmd->viewangles;
-
-
-	DoAntiAimX(Settings::Ragebot::Pitch, angles);
-	DoAntiAimY(Settings::Ragebot::RealYaw, angles);
-
-	NormalizeAngles(angles);
-	ClampAngles(angles);
-
-	if (Settings::Ragebot::UntrustedCheck)
-		ClampAngles(angles);
-
-	QAngle view = cmd->viewangles;
-
-
-
-	cmd->viewangles = angles;
-	NormalizeAngles(cmd->viewangles);
-
-	float oldSide = cmd->sidemove;
-	float oldFoward = cmd->forwardmove;
-	CorrectMovement(view, cmd, oldFoward, oldSide);
-
-	lastReal = cmd->viewangles;
-}
-
-void CAimbot::AntiAimCreateMoveFake(CUserCmd* cmd, bool& bSendPacket)
-{
-	if (!(Settings::Ragebot::AAEnabled))
-		return;
-
-	CBaseEntity* pLocalPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
-
-
-	if (m_pLocal->WeaponType == WEAPON_TYPE_GRENADE)
-		return;
-
-	if ((cmd->buttons & IN_USE) || enum MoveType_t() & (MOVETYPE_LADDER) || cmd->buttons & IN_ATTACK || cmd->buttons & IN_ATTACK2)
-		return;
-
-	if (!Interfaces::Engine()->IsInGame() || !pLocalPlayer || pLocalPlayer->IsDead())
-	{
-		NormalizeAngles(cmd->viewangles);
-		return;
-	}
-
-	static bool bFlip;
-
-	QAngle angles = cmd->viewangles;
-
-	if (!bSendPacket)
-		bFlip = false;
-
-	DoAntiAimY(Settings::Ragebot::FakeYaw, angles);
-
-	NormalizeAngles(angles);
-	ClampAngles(angles);
-
-
-	QAngle view = cmd->viewangles;
-
-	cmd->viewangles = angles;
-	NormalizeAngles(cmd->viewangles);
-
-	float oldSide = cmd->sidemove;
-	float oldFoward = cmd->forwardmove;
-	CorrectMovement(view, cmd, oldFoward, oldSide);
-
-	if (bFlip)
-		lastFake = angles;
-	else
-		lastReal = angles;
-	if (Settings::Ragebot::FakeYaw == 0)
-		lastReal = angles;
-
-	bSendPacket = bFlip;
-
-	if (Settings::Ragebot::FakeYaw == 0)
-		bFlip = true;
-	else
-		bFlip = !bFlip;
+	Aimbot();
 }

@@ -1,5 +1,162 @@
 #include "CSX_Hook.h"
 //[junk_enable /]
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                               VMT UNDETECTED HOOKS																											 //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+auto table_is_hooked(void* table, const char* module_table_dst) -> const bool
+{
+	if (table == nullptr) return false;
+	const auto module_base = GetModuleHandleA(module_table_dst);
+	const auto dos_header = reinterpret_cast< PIMAGE_DOS_HEADER > (module_base);
+	const auto nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS> (reinterpret_cast<std::uint8_t*>(module_base) + dos_header->e_lfanew);
+	const auto module_end = reinterpret_cast< std::uintptr_t >(module_base) + nt_headers->OptionalHeader.SizeOfImage - sizeof(std::uintptr_t);
+	const auto table_dst = *reinterpret_cast<std::uintptr_t*>(table);
+	return (table_dst < reinterpret_cast< std::uintptr_t >(module_base) || table_dst > module_end);
+}
+uintptr_t* vfunc_hook::search_free_data_page(const char* module_name, const std::size_t vmt_size) //Modified code from exphck https://www.unknowncheats.me/forum/2128832-post43.html
+{
+	auto check_data_section = [&](LPCVOID address, const std::size_t vmt_size)
+	{
+		const DWORD DataProtection = (PAGE_EXECUTE_READWRITE | PAGE_READWRITE);
+		MEMORY_BASIC_INFORMATION mbi = { 0 };
+
+		if (VirtualQuery(address, &mbi, sizeof(mbi)) == sizeof(mbi) && mbi.AllocationBase && mbi.BaseAddress &&
+			mbi.State == MEM_COMMIT && !(mbi.Protect & PAGE_GUARD) && mbi.Protect != PAGE_NOACCESS)
+		{
+			if ((mbi.Protect & DataProtection) && mbi.RegionSize >= vmt_size)
+			{
+				return ((mbi.Protect & DataProtection) && mbi.RegionSize >= vmt_size) ? true : false;
+			}
+		}
+		return false;
+	};
+
+	auto module_addr = GetModuleHandleA(module_name);
+
+	if (module_addr == nullptr)
+		return nullptr;
+
+	const auto dos_header = reinterpret_cast< PIMAGE_DOS_HEADER > (module_addr);
+	const auto nt_headers = reinterpret_cast< PIMAGE_NT_HEADERS > (reinterpret_cast< std::uint8_t* >(module_addr) + dos_header->e_lfanew);
+
+	const auto module_end = reinterpret_cast< std::uintptr_t >(module_addr) + nt_headers->OptionalHeader.SizeOfImage - sizeof(std::uintptr_t);
+
+	for (auto current_address = module_end; current_address > (DWORD)module_addr; current_address -= sizeof(std::uintptr_t))
+	{
+		if (*reinterpret_cast< std::uintptr_t* >(current_address) == 0 && check_data_section(reinterpret_cast< LPCVOID >(current_address), vmt_size))
+		{
+			bool is_good_vmt = true;
+			auto page_count = 0u;
+
+			for (; page_count < vmt_size && is_good_vmt; page_count += sizeof(std::uintptr_t))
+			{
+				if (*reinterpret_cast< std::uintptr_t* >(current_address + page_count) != 0)
+					is_good_vmt = false;
+			}
+
+			if (is_good_vmt && page_count >= vmt_size)
+				return (uintptr_t*)current_address;
+		}
+	}
+	return nullptr;
+}
+
+vfunc_hook::vfunc_hook()
+	: class_base(nullptr), vftbl_len(0), new_vftb1(nullptr), old_vftbl(nullptr)
+{
+}
+vfunc_hook::vfunc_hook(void* base)
+	: class_base(base), vftbl_len(0), new_vftb1(nullptr), old_vftbl(nullptr)
+{
+}
+vfunc_hook::~vfunc_hook()
+{
+	unhook_all();
+	if (wasAllocated)
+		delete[] new_vftb1;
+}
+
+bool vfunc_hook::setup(void* base, const char * moduleName)
+{
+	if (base != nullptr)
+		class_base = base;
+
+	if (class_base == nullptr)
+		return false;
+
+	old_vftbl = *(std::uintptr_t**)class_base;
+	vftbl_len = estimate_vftbl_length(old_vftbl) * sizeof(std::uintptr_t);
+
+	if (vftbl_len == 0)
+		return false;
+
+
+	if (moduleName)// If provided a module name then we will find a place in that module				
+	{
+		new_vftb1 = search_free_data_page(moduleName, vftbl_len + sizeof(std::uintptr_t));
+		std::memset(new_vftb1, NULL, vftbl_len + sizeof(std::uintptr_t));
+		std::memcpy(&new_vftb1[1], old_vftbl, vftbl_len);
+		new_vftb1[0] = old_vftbl[-1];
+		try {
+			auto guard = detail::protect_guard{ class_base, sizeof(std::uintptr_t), PAGE_READWRITE };
+
+			*(std::uintptr_t**)class_base = &new_vftb1[1];
+			wasAllocated = false;
+			if (table_is_hooked(base, moduleName))
+			{
+				Beep(500, 500);
+			}
+		}
+		catch (...) {
+			delete[] new_vftb1;
+			return false;
+		}
+	}
+	else // If not then we do regular vmthookinh
+	{
+		new_vftb1 = new std::uintptr_t[vftbl_len + 1]();
+		std::memcpy(&new_vftb1[1], old_vftbl, vftbl_len);
+		try {
+			auto guard = detail::protect_guard{ class_base, sizeof(std::uintptr_t), PAGE_READWRITE };
+			new_vftb1[0] = old_vftbl[-1];
+			*(std::uintptr_t**)class_base = &new_vftb1[1];
+			wasAllocated = true;
+		}
+		catch (...) {
+			delete[] new_vftb1;
+			return false;
+		}
+	}
+
+
+	return true;
+}
+
+std::size_t vfunc_hook::estimate_vftbl_length(std::uintptr_t* vftbl_start)
+{
+	MEMORY_BASIC_INFORMATION memInfo = { NULL };
+	int m_nSize = -1;
+	do {
+		m_nSize++;
+		VirtualQuery(reinterpret_cast<LPCVOID>(vftbl_start[m_nSize]), &memInfo, sizeof(memInfo));
+
+	} while (memInfo.Protect == PAGE_EXECUTE_READ || memInfo.Protect == PAGE_EXECUTE_READWRITE);
+	return m_nSize;
+}
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                               VMT DETECTED HOOKS																											 //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 namespace CSX
 {
 	namespace Hook
@@ -49,7 +206,8 @@ namespace CSX
 			while (!CSX::Utils::IsBadReadPtr(pPtrOldTable[dwCountFunc]))
 				dwCountFunc++;
 
-			
+			//while ( !IsBadCodePtr( (FARPROC)pPtrOldTable[dwCountFunc] ) && !CSX::Utils::IsBadReadPtr( pPtrOldTable[dwCountFunc] ) )
+			//	dwCountFunc++;
 
 			if (dwCountFunc)
 			{
@@ -106,126 +264,5 @@ namespace CSX
 			if (!CSX::Utils::IsBadReadPtr(pPtrPtrTable))
 				*(PDWORD)pPtrPtrTable = (DWORD)pPtrNewTable;
 		}
-
-
-
-		BOOL	VTHookManager::NativeNtProtectVirtualMemory(LPVOID lpAddress, SIZE_T dwSize, DWORD flNewProtect, PDWORD lpflOldProtect)
-		{
-			typedef LONG * NTAPI LPFN_NtProtectVirtualMemory(HANDLE, PVOID *, PULONG, ULONG, PULONG);
-			LPFN_NtProtectVirtualMemory * NtProtectVirtualMemory = (LPFN_NtProtectVirtualMemory*)(GetProcAddress(GetModuleHandleA(("ntdll.dll")), ("NtProtectVirtualMemory")));
-
-			if (!NtProtectVirtualMemory)
-				return FALSE;
-
-			NtProtectVirtualMemory(GetCurrentProcess(), (PVOID*)&lpAddress, (PULONG)&dwSize, flNewProtect, lpflOldProtect);
-
-			return TRUE;
-		}
-
-
-		VTHookManager::VTHookManager()
-		{
-			DWORD oProtection;
-			NativeNtProtectVirtualMemory(reinterpret_cast<void*>(this), 4, PAGE_READWRITE, &oProtection);
-			memset(this, 0, sizeof(VTHookManager));
-			NativeNtProtectVirtualMemory(reinterpret_cast<void*>(this), 4, oProtection, &oProtection);
-		}
-
-		VTHookManager::VTHookManager(PDWORD* ppdwClassBase)
-		{
-			bInitialize(ppdwClassBase);
-		}
-
-		VTHookManager::~VTHookManager()
-		{
-			UnHook();
-		}
-
-		bool 	VTHookManager::bInitialize(PDWORD* ppdwClassBase)
-		{
-			m_ppdwClassBase = ppdwClassBase;
-			m_pdwOldVMT = *ppdwClassBase;
-			m_dwVMTSize = dwGetVMTCount(*ppdwClassBase);
-			m_pdwNewVMT = new DWORD[m_dwVMTSize];
-			DWORD oProtection;
-			NativeNtProtectVirtualMemory(reinterpret_cast<void*>(m_pdwNewVMT), 4, PAGE_READWRITE, &oProtection);
-			memcpy(m_pdwNewVMT, m_pdwOldVMT, sizeof(DWORD)* m_dwVMTSize);
-			NativeNtProtectVirtualMemory(reinterpret_cast<void*>(m_pdwNewVMT), 4, oProtection, &oProtection);
-			*ppdwClassBase = m_pdwNewVMT;
-			return true;
-		}
-
-		bool 	VTHookManager::bInitialize(PDWORD** pppdwClassBase)
-		{
-			return bInitialize(*pppdwClassBase);
-		}
-
-		void	VTHookManager::UnHook() const
-		{
-			if (m_ppdwClassBase)
-				*m_ppdwClassBase = m_pdwOldVMT;
-
-		}
-
-		void 	VTHookManager::ReHook() const
-		{
-			if (m_ppdwClassBase)
-				*m_ppdwClassBase = m_pdwNewVMT;
-
-		}
-
-		int 	VTHookManager::iGetFuncCount() const
-		{
-			return static_cast<int>(m_dwVMTSize);
-		}
-
-		DWORD 	VTHookManager::dwGetMethodAddress(int Index) const
-		{
-			if (Index >= 0 && Index <= static_cast<int>(m_dwVMTSize) && m_pdwOldVMT != nullptr)
-				return m_pdwOldVMT[Index];
-
-			return NULL;
-		}
-
-		PDWORD 	VTHookManager::pdwGetOldVMT() const
-		{
-			return m_pdwOldVMT;
-		}
-
-		DWORD 	VTHookManager::dwHookMethod(DWORD dwNewFunc, unsigned int iIndex) const
-		{
-			if (m_pdwNewVMT && m_pdwOldVMT && iIndex <= m_dwVMTSize && iIndex >= 0)
-			{
-				m_pdwNewVMT[iIndex] = dwNewFunc;
-				return m_pdwOldVMT[iIndex];
-			}
-
-			return 0;
-		}
-
-		DWORD 	VTHookManager::dwUnHookMethod(unsigned int iIndex) const
-		{
-			if (m_pdwNewVMT && m_pdwOldVMT && iIndex <= m_dwVMTSize && iIndex >= 0)
-			{
-				m_pdwNewVMT[iIndex] = m_pdwOldVMT[iIndex];
-				return m_pdwOldVMT[iIndex];
-			}
-
-			return NULL;
-		}
-
-		DWORD  VTHookManager::dwGetVMTCount(PDWORD pdwVMT)
-		{
-			DWORD dwIndex = 0;
-
-			for (dwIndex = 0; pdwVMT[dwIndex]; dwIndex++)
-			{
-				if (IsBadCodePtr(reinterpret_cast<FARPROC>(pdwVMT[dwIndex])))
-					break;
-
-			}
-			return dwIndex;
-		}
-
 	}
 }

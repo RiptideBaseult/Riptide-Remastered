@@ -17,7 +17,6 @@ public:
 	void CalcRadarPoint( Vector vOrigin , int& screenx , int& screeny );
 
 	void OnRenderPlayer();
-	void OnRenderSounds();
 	void OnRender();
 //[/swap_lines]
 };

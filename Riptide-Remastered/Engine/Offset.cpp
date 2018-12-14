@@ -15,7 +15,6 @@ namespace Engine
 			DWORD m_iObserverMode = 0;
 			DWORD m_hObserverTarget = 0;
 
-			DWORD m_nHitboxSet = 0;
 			DWORD m_vecOrigin = 0;
 			DWORD deadflag = 0;
 
@@ -43,7 +42,6 @@ namespace Engine
 			DWORD m_vecViewOffset = 0;
 
 			DWORD m_angEyeAngles = 0;
-			DWORD m_iWeaponID = 0;
 
 			DWORD m_hActiveWeapon = 0;
 
@@ -51,7 +49,7 @@ namespace Engine
 			DWORD m_flNextPrimaryAttack = 0;
 			DWORD m_bCanReload = 0;
 
-			DWORD m_iItemDefinitionIndex = 0;
+			int16 m_iItemDefinitionIndex = 0;
 			DWORD m_iItemIDHigh = 0;
 			DWORD m_iAccountID = 0;
 			DWORD m_iEntityQuality = 0;
@@ -72,8 +70,6 @@ namespace Engine
 			DWORD m_hGroundEntity = 0;
 			DWORD m_nWaterLevel = 0;
 			DWORD movetype = 0;
-			DWORD m_flFlashBangTime = 0;
-			DWORD m_nMoveType = 0;
 			//[/swap_lines]
 		}
 
@@ -150,3 +146,175 @@ namespace Engine
 		}
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
