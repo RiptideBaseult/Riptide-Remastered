@@ -62,6 +62,17 @@ namespace SDK
 		x = ix; y = iy; z = iz;
 	}
 
+	float Vector::Dist(const Vector &vOther) const
+	{
+		Vector delta;
+
+		delta.x = x - vOther.x;
+		delta.y = y - vOther.y;
+		delta.z = z - vOther.z;
+
+		return delta.Length();
+	}
+
 	Vector Vector::Normalized() const {
 		Vector res = *this;
 		vec_t l = res.Length();
@@ -76,6 +87,60 @@ namespace SDK
 	vec_t Vector::NormalizeInPlace() {
 		return NormalizeVector(*this);
 	}
+
+	Vector Vector::AngleBetweenXY(const Vector& a, const Vector& b)
+	{
+		Vector angles;
+
+		float distanceX = (b.x - a.x);
+		float distanceY = (b.y - a.y);
+		float distanceZ = (b.z - a.z);
+
+		float hipotenuseXY = sqrtf(distanceX*distanceX + distanceY * distanceY);
+		//float hipotenuseXZ = sqrt(distanceX*distanceX + distanceZ*distanceZ);
+		//float hipotenuseYZ = sqrt(distanceY*distanceY + distanceZ*distanceZ);
+
+		angles.x = atanf(distanceZ / hipotenuseXY) * (180.0f) * -1.0f;
+		angles.y = atanf(distanceY / distanceX) * (180.0f);
+
+		if (distanceX < 0)
+			angles.y += 180.0f;
+
+		angles.z = 0;
+
+		return angles;
+	}
+
+
+	Vector Vector::ClampAngles() const
+	{
+		Vector vec = *this;
+		if (vec.x > 89.0f && vec.x <= 180.0f)
+		{
+			vec.x = 89.0f;
+		}
+		while (vec.x > 180.f)
+		{
+			vec.x -= 360.f;
+		}
+		while (vec.x < -89.0f)
+		{
+			vec.x = -89.0f;
+		}
+		while (vec.y > 180.f)
+		{
+			vec.y -= 360.f;
+		}
+		while (vec.y < -180.f)
+		{
+			vec.y += 360.f;
+		}
+
+		vec.z = 0;
+		return vec;
+
+	}
+
 
 	void Vector::Random(vec_t minVal, vec_t maxVal) {
 		x = minVal + ((float)rand() / RAND_MAX) * (maxVal - minVal);
@@ -280,172 +345,3 @@ namespace SDK
 		return res;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

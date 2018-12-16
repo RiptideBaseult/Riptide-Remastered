@@ -264,3 +264,9 @@ namespace SDK
 		virtual bool                  IsReplay( void ) = 0;
 	};
 }
+
+class IClientModeShared
+{
+public:
+
+};

@@ -14,12 +14,12 @@
 
 #define VirtualFn( cast ) typedef cast( __thiscall* OriginalFn )
 
-template< typename Function > Function GetMethod(PVOID Base, DWORD Index)
+template< typename Function > Function GetMethod( PVOID Base , DWORD Index )
 {
 	PDWORD* VTablePointer = (PDWORD*)Base;
 	PDWORD VTableFunctionBase = *VTablePointer;
 	DWORD dwAddress = VTableFunctionBase[Index];
-	return (Function)(dwAddress);
+	return (Function)( dwAddress );
 }
 
 typedef struct con_nprint_s
@@ -35,7 +35,7 @@ struct ScreenFade_t
 	unsigned short 	duration;		// FIXED 16 bit, with SCREENFADE_FRACBITS fractional, seconds duration
 	unsigned short 	holdTime;		// FIXED 16 bit, with SCREENFADE_FRACBITS fractional, seconds duration until reset (fade & hold)
 	short			fadeFlags;		// flags
-	byte			r, g, b, a;		// fade to color ( max alpha )
+	byte			r , g , b , a;		// fade to color ( max alpha )
 };
 
 struct CHudTexture
@@ -52,37 +52,50 @@ struct CHudTexture
 	int		iPosX[4];			//0x009C
 }; //Size=0x00AC
 
+enum CSWeaponType
+{
+	WEAPONTYPE_KNIFE = 0,
+	WEAPONTYPE_PISTOL,
+	WEAPONTYPE_SUBMACHINEGUN,
+	WEAPONTYPE_RIFLE,
+	WEAPONTYPE_SHOTGUN,
+	WEAPONTYPE_SNIPER_RIFLE,
+	WEAPONTYPE_MACHINEGUN,
+	WEAPONTYPE_C4,
+	WEAPONTYPE_GRENADE,
+	WEAPONTYPE_UNKNOWN
+};
 class CWeaponInfo
 {
 public:
 	char _0x0000[20];
-	__int32 iMaxClip1;            //0x0014 
+	__int32 max_clip;	//0x0014 
 	char _0x0018[12];
-	__int32 max_reserved_ammo;    //0x0024 
+	__int32 max_reserved_ammo;	//0x0024 
 	char _0x0028[96];
-	char* hud_name;                //0x0088 
-	char* weapon_name;            //0x008C 
+	char* hud_name;//0x0088 
+	char* weapon_name;	//0x008C 
 	char _0x0090[60];
-	__int32 WeaponType;                //0x00CC 
-	__int32 price;                //0x00D0 
-	__int32 reward;                //0x00D4 
+	__int32 type;//0x00CC 
+	__int32 price;//0x00D0 
+	__int32 reward;//0x00D4 
 	char _0x00D8[20];
-	BYTE full_auto;                //0x00EC 
+	BYTE full_auto;//0x00EC 
 	char _0x00ED[3];
-	__int32 iDamage;                //0x00F0 
-	float flArmorRatio;            //0x00F4 
-	__int32 bullets;            //0x00F8 
-	float flPenetration;            //0x00FC 
+	__int32 damage;//0x00F0 
+	float armor_ratio;	//0x00F4 
+	__int32 bullets;	//0x00F8 
+	float penetration;	//0x00FC 
 	char _0x0100[8];
-	float m_flRange;                //0x0108 
-	float flRangeModifier;        //0x010C 
+	float range;//0x0108 
+	float range_modifier;//0x010C 
 	char _0x0110[16];
-	BYTE silencer;                //0x0120 
+	BYTE silencer;//0x0120 
 	char _0x0121[15];
-	float max_speed;            //0x0130 
-	float max_speed_alt;        //0x0134 
+	float max_speed;	//0x0130 
+	float max_speed_alt;//0x0134 
 	char _0x0138[76];
-	__int32 flInaccuracyMove;        //0x0184 
+	__int32 recoil_seed;//0x0184 
 	char _0x0188[32];
 };
 namespace SDK
@@ -132,14 +145,17 @@ namespace SDK
 		FRAME_RENDER_END
 	};
 
-	enum class ObserverMode_t : int
-	{
-		OBS_MODE_NONE = 0,
-		OBS_MODE_DEATHCAM = 1,
-		OBS_MODE_FREEZECAM = 2,
-		OBS_MODE_FIXED = 3,
-		OBS_MODE_IN_EYE = 4,
-		OBS_MODE_CHASE = 5,
-		OBS_MODE_ROAMING = 6
-	};
+
+
+		enum class ObserverMode_t : int
+		{
+			OBS_MODE_NONE = 0,
+			OBS_MODE_DEATHCAM = 1,
+			OBS_MODE_FREEZECAM = 2,
+			OBS_MODE_FIXED = 3,
+			OBS_MODE_IN_EYE = 4,
+			OBS_MODE_CHASE = 5,
+			OBS_MODE_ROAMING = 6
+		};
+	
 }

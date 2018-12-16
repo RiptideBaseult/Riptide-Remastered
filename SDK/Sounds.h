@@ -8,5 +8,4 @@ namespace SDK
 	extern char hitler_wav[313996];
 	extern char inject_wav[411796];
 	extern char FadeCSGO[237578];
-	extern char skeethitmarker_wav[106076];
 }

@@ -12,6 +12,7 @@ namespace SDK
 		return reinterpret_cast<CreateInterfaceFn>(GetProcAddress(module, "CreateInterface"));
 	}
 	auto EnginePointer = get_module_factory(GetModuleHandleW(L"engine.dll"));
+	auto PhysPointer   = get_module_factory(GetModuleHandleW(L"vphysics.dll"));
 	//[swap_lines]
 	IVEngineClient*     Interfaces::g_pEngine = nullptr;
 	IBaseClientDLL*     Interfaces::g_pClient = nullptr;
@@ -21,6 +22,7 @@ namespace SDK
 	IEngineTrace*       Interfaces::g_pEngineTrace = nullptr;
 	IClientMode*        Interfaces::g_pClientMode = nullptr;
 	IVModelInfoClient*	Interfaces::g_pModelInfo = nullptr;
+	CEffects* Interfaces::g_pEffects = nullptr;
 	IEngineSound*		Interfaces::g_pSound = nullptr;
 	IVModelRender*		Interfaces::g_pModelRender = nullptr;
 	IVRenderView*		Interfaces::g_pRenderView = nullptr;
@@ -31,7 +33,14 @@ namespace SDK
 	ConVar*             Interfaces::g_pConVar = nullptr;
 	IViewRenderBeams*   shit::g_ViewRenderBeams = nullptr;
 	IDebugOverlay*  Interfaces::g_DebugOverlay = nullptr;
-	CEffects*			Interfaces::g_pEffects = nullptr;
+	ILocalize*          Interfaces::g_pILocalize = nullptr;
+	CNetworkStringTableContainer* Interfaces::g_ClientStringTableContainer = nullptr; //custommodels
+	IPhysicsSurfaceProps*  Interfaces::g_Physprops = nullptr;
+	IVPanel* Interfaces::g_pPanel = nullptr;
+	ISteamGameCoordinator* Interfaces::g_pSteamGameCoordinator = nullptr;
+	ISteamUser* Interfaces::g_pSteamUser = nullptr;
+
+
 	//[/swap_lines]
 	//[junk_enable /]
 	CreateInterfaceFn CaptureFactory(char* FactoryModule)
@@ -82,7 +91,8 @@ namespace SDK
 		return g_pEngine;
 	}
 
-	IBaseClientDLL* Interfaces::Client()
+
+		IBaseClientDLL* Interfaces::Client()
 	{
 		if (!g_pClient)
 		{
@@ -172,6 +182,7 @@ namespace SDK
 
 		return g_pClientMode;
 	}
+
 
 	IVModelInfoClient* Interfaces::ModelInfo()
 	{
@@ -281,7 +292,20 @@ namespace SDK
 			CSX::Log::Add("::g_pInputSystem = %X", g_pInputSystem);
 #endif
 		}
+
 		return g_pInputSystem;
+	}
+
+	ILocalize* Interfaces::GetLocalize()
+	{
+		if (!g_pILocalize)
+		{
+			CreateInterfaceFn pfnFactory = CaptureFactory("localize.dll");
+			g_pILocalize = CaptureInterface<ILocalize>(pfnFactory, "Localize_001");
+
+		}
+
+		return g_pILocalize;
 	}
 
 	ConVar* Interfaces::GetConVar()
@@ -296,18 +320,36 @@ namespace SDK
 		return g_pConVar;
 	}
 
-	CEffects* Interfaces::Effects()
+	ISteamUser* Interfaces::SteamUser()
 	{
-		if (Interfaces::Engine()->IsInGame())
-		{
-			if (!g_pEffects)
-			{
-				CreateInterfaceFn pfnFactory = CaptureFactory(ENGINE_DLL);
-				g_pEffects = CaptureInterface<CEffects>(pfnFactory, VENGINEVEFFECTS_INTERFACE_VERSION);
-			}
-			return g_pEffects;
+		if (!g_pSteamUser) {
+			SteamGameCoordinator();
 		}
+
+		return g_pSteamUser;
 	}
+
+	ISteamGameCoordinator* Interfaces::SteamGameCoordinator()
+	{
+		if (!g_pSteamGameCoordinator) {
+			typedef uint32_t SteamPipeHandle;
+			typedef uint32_t SteamUserHandle;
+
+			SteamUserHandle hSteamUser = ((SteamUserHandle(__cdecl*)(void))GetProcAddress(GetModuleHandle("steam_api.dll"), "SteamAPI_GetHSteamUser"))();
+			SteamPipeHandle hSteamPipe = ((SteamPipeHandle(__cdecl*)(void))GetProcAddress(GetModuleHandle("steam_api.dll"), "SteamAPI_GetHSteamPipe"))();
+
+			auto SteamClient = ((ISteamClient*(__cdecl*)(void))GetProcAddress(GetModuleHandle("steam_api.dll"), "SteamClient"))();
+
+			auto SteamHTTP = SteamClient->GetISteamHTTP(hSteamUser, hSteamPipe, "STEAMHTTP_INTERFACE_VERSION002");
+			g_pSteamUser = SteamClient->GetISteamUser(hSteamUser, hSteamPipe, "SteamUser019");
+			auto SteamFriends = SteamClient->GetISteamFriends(hSteamUser, hSteamPipe, "SteamFriends015");
+			auto SteamInventory = SteamClient->GetISteamInventory(hSteamUser, hSteamPipe, "STEAMINVENTORY_INTERFACE_V002");
+			g_pSteamGameCoordinator = (ISteamGameCoordinator*)SteamClient->GetISteamGenericInterface(hSteamUser, hSteamPipe, "SteamGameCoordinator001");
+		}
+
+		return g_pSteamGameCoordinator;
+	}
+
 	IViewRenderBeams* shit::g_pViewRenderBeams()
 	{
 		if (!g_ViewRenderBeams)
@@ -325,174 +367,47 @@ namespace SDK
 		}
 		return g_DebugOverlay;
 	}
+
+	
+	CNetworkStringTableContainer* Interfaces::ClientStringTableContainer()
+	{
+		if (!g_ClientStringTableContainer)
+		{
+			g_ClientStringTableContainer = (CNetworkStringTableContainer*)EnginePointer("VEngineClientStringTable001", NULL);
+		}
+		return g_ClientStringTableContainer;
+	}
+
+
+
+	IPhysicsSurfaceProps* Interfaces::Physprops()
+	{
+		if (!g_Physprops)
+		{		
+			CreateInterfaceFn pfnFactory = CaptureFactory("vphysics.dll");
+			g_Physprops = CaptureInterface<IPhysicsSurfaceProps>(pfnFactory, "VPhysicsSurfaceProps001");
+		}
+		return g_Physprops;
+	}
+
+	CEffects* Interfaces::Effects()
+	{
+		if (!g_pEffects)
+		{
+			CreateInterfaceFn pfnFactory = CaptureFactory(ENGINE_DLL);
+			g_pEffects = CaptureInterface<CEffects>(pfnFactory, VENGINEVEFFECTS_INTERFACE_VERSION);
+		}
+		return g_pEffects;
+	}
+
+	IVPanel* Interfaces::VPanel()
+	{
+		if (!g_pPanel)
+		{
+			CreateInterfaceFn pfnFactory = CaptureFactory("vgui2.dll");
+			g_pPanel = CaptureInterface<IVPanel>(pfnFactory, "VGUI_Panel009");
+		}
+		return g_pPanel;
+	}
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

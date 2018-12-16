@@ -165,12 +165,14 @@ namespace SDK
 				);
 			}
 		}
+
 		ImU32 GetU32()
 		{
 			return ((_color[3] & 0xff) << 24) + ((_color[2] & 0xff) << 16) + ((_color[1] & 0xff) << 8)
 				+ (_color[0] & 0xff);
 			//return (ImU32)(((_color[3] & 0xff) << 24) + ((_color[0] & 0xff) << 16) + ((_color[1] & 0xff) << 8) + (_color[2] & 0xff));
 		}
+
 		DEFCOLOR_SRC(Black, 0, 0, 0);
 		DEFCOLOR_SRC(White, 255, 255, 255);
 		DEFCOLOR_SRC(Red, 255, 0, 0);

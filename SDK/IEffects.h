@@ -52,7 +52,7 @@ namespace SDK
 	class CEffects
 	{
 	public:
-		dlight_t * CL_AllocDlight(int key)
+		dlight_t* CL_AllocDlight(int key)
 		{
 			typedef dlight_t*(__thiscall* FindVarFn)(PVOID, int);
 			return GetMethod<FindVarFn>(this, 4)(this, key);

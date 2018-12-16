@@ -102,6 +102,11 @@ namespace SDK
 
 	class IClientMode {
 	public:
+		bool DoPostScreenSpaceEffects(int callback)
+		{
+			VirtualFn(int)(IClientMode*, int);
+			return GetMethod< OriginalFn >(this, 44)(this, callback);
+		}
 		bool OverrideView( CViewSetup* pSetup )
 		{
 			VirtualFn( bool )( PVOID , CViewSetup* );

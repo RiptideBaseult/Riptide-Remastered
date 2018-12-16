@@ -95,7 +95,6 @@ namespace SDK
 	void CRC32_Final( CRC32_t *pulCRC ) {
 		*pulCRC ^= CRC32_XOR_VALUE;
 	}
-	
 
 	CRC32_t   CRC32_GetTableEntry( unsigned int slot ) {
 		return pulCRCTable[(unsigned char)slot];

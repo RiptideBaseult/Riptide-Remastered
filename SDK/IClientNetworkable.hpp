@@ -29,7 +29,6 @@ namespace SDK
 		virtual void             PostDataUpdate( DataUpdateType_t updateType ) = 0;
 		virtual void             unknown( void ) = 0;
 		virtual bool             IsDormant( void ) = 0;
-	//	bool                     IsDormant() { return *reinterpret_cast<bool*>(uintptr_t(this) + 0xED); }
 		virtual int              EntIndex( void ) const = 0;
 		virtual void             ReceiveMessage( int classID , bf_read& msg ) = 0;
 		virtual void*            GetDataTableBasePtr() = 0;

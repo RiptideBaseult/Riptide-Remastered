@@ -41,10 +41,10 @@ namespace SDK
 	public:
 		virtual ~CUserCmd() {};
 
-		CRC32_t GetChecksum( void ) const
+		CRC32_t GetChecksum(void) const
 		{
 			CRC32_t crc;
-			CRC32_Init( &crc );
+			CRC32_Init(&crc);
 
 			CRC32_ProcessBuffer(&crc, &command_number, sizeof(command_number));
 			CRC32_ProcessBuffer(&crc, &tick_count, sizeof(tick_count));
@@ -81,7 +81,6 @@ namespace SDK
 		short     mousedy;            // 0x46
 		bool      hasbeenpredicted;   // 0x48
 		char      pad_0x4C[0x18];     // 0x4C
-
 	};
 
 	class CVerifiedUserCmd
@@ -103,7 +102,7 @@ namespace SDK
 			using OriginalFn = CUserCmd * (__thiscall *)(void *, int, int);
 			return GetVirtualFunction<OriginalFn>(this, 8)(this, slot, seq);
 		}
-		char                pad_0x00[0x08];
+		char                pad_0x00[0x08];					
 		bool                m_fTrackIRAvailable;            //0x04
 		bool                m_fMouseInitialized;            //0x05
 		bool                m_fMouseActive;                 //0x06
@@ -132,40 +131,42 @@ namespace SDK
 	class IInputSystem
 	{
 	public:
-		void EnableInput( bool bEnable )
+		void EnableInput(bool bEnable)
 		{
-			VirtualFn( void* )( PVOID , bool );
-			GetMethod< OriginalFn >( this , 11 )( this , bEnable );
+			VirtualFn(void*)(PVOID, bool);
+			GetMethod< OriginalFn >(this, 11)(this, bEnable);
 		}
 
-		bool IsButtonDown( ButtonCode_t code )
+		bool IsButtonDown(ButtonCode_t code)
 		{
-			VirtualFn( bool )( PVOID , ButtonCode_t );
-			return GetMethod< OriginalFn >( this , 15 )( this , code );
+			VirtualFn(bool)(PVOID, ButtonCode_t);
+			return GetMethod< OriginalFn >(this, 15)(this, code);
 		}
 
 		void ResetInputState()
 		{
-			VirtualFn( void )( PVOID );
-			GetMethod< OriginalFn >( this , 39 )( this );
+			VirtualFn(void)(PVOID);
+			GetMethod< OriginalFn >(this, 39)(this);
 		}
 
-		ButtonCode_t VirtualKeyToButtonCode( int nVirtualKey )
+
+
+		ButtonCode_t VirtualKeyToButtonCode(int nVirtualKey)
 		{
-			VirtualFn( ButtonCode_t )( PVOID , int );
-			return GetMethod< OriginalFn >( this , 44 )( this , nVirtualKey );
+			VirtualFn(ButtonCode_t)(PVOID, int);
+			return GetMethod< OriginalFn >(this, 44)(this, nVirtualKey);
 		}
 
-		int ButtonCodeToVirtualKey( ButtonCode_t code )
+		int ButtonCodeToVirtualKey(ButtonCode_t code)
 		{
-			VirtualFn( int )( PVOID , ButtonCode_t );
-			return GetMethod< OriginalFn >( this , 45 )( this , code );
+			VirtualFn(int)(PVOID, ButtonCode_t);
+			return GetMethod< OriginalFn >(this, 45)(this, code);
 		}
 
-		void GetCursorPosition( int* m_pX , int* m_pY )
+		void GetCursorPosition(int* m_pX, int* m_pY)
 		{
-			VirtualFn( void )( PVOID , int* , int* );
-			GetMethod< OriginalFn >( this , 56 )( this , m_pX , m_pY );
+			VirtualFn(void)(PVOID, int*, int*);
+			GetMethod< OriginalFn >(this, 56)(this, m_pX, m_pY);
 		}
 	};
 }

@@ -2,7 +2,7 @@
 #pragma warning
 #include "Vector.hpp"
 #include "..\SDK\Definitions.hpp"
-#include "Color.hpp"
+#include "Color.hpp" 
 
 namespace SDK
 {
@@ -20,6 +20,14 @@ namespace SDK
 		virtual void AddSweptBoxOverlay(const Vector& start, const Vector& end, const Vector& mins, const Vector& max, const Vector & angles, int r, int g, int b, int a, float flDuration) = 0;
 		virtual void AddGridOverlay(const Vector& origin) = 0;
 		virtual void AddCoordFrameOverlay(const matrix3x4_t& frame, float flScale, int vColorTable[3][3] = NULL) = 0;
+
+		void AddCapsuleOverlay(Vector& mins, Vector& maxs, float pillradius, int r, int g, int b, int a, float duration)
+
+		{
+
+			return GetMethod<void(__thiscall*)(void*, Vector&, Vector&, float&, int, int, int, int, float)>(this, 24)(this, mins, maxs, pillradius, r, g, b, a, duration);
+
+		}
 
 		int ScreenPosition(const Vector &vecOrigin, Vector &vecScreen)
 		{
@@ -41,5 +49,4 @@ namespace SDK
 
 		virtual void PurgeTextOverlays() = 0;
 	};
-
-};
+}

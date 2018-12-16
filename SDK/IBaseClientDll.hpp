@@ -19,7 +19,7 @@ namespace SDK
 		{
 			enum
 			{
-				hkFrameStageNotify = 37
+				FrameStageNotify = 37
 			};
 		}
 	}
@@ -47,9 +47,8 @@ namespace SDK
 		virtual void			IN_ClearStates( void ) = 0;
 		virtual bool			IN_IsKeyDown( const char *name , bool& isdown ) = 0;
 		virtual int				IN_KeyEvent( int eventcode , ButtonCode_t keynum , const char *pszCurrentBinding ) = 0;
-		virtual void xxd() = 0; // <- i added shit
-		virtual void			CreateMove( int sequence_number , float input_sample_frametime , bool active ) = 0;//22
-		
+		virtual void xd() = 0;
+		virtual void			CreateMove( int sequence_number , float input_sample_frametime , bool active ) = 0;
 		virtual void			ExtraMouseSample( float frametime , bool active ) = 0;
 		virtual bool			WriteUsercmdDeltaToBuffer( int nSlot , bf_write *buf , int from , int to , bool isnewcommand ) = 0;
 		virtual void			EncodeUserCmdToBuffer( int nSlot , bf_write& buf , int slot ) = 0;
@@ -64,7 +63,7 @@ namespace SDK
 		virtual void			VoiceStatus( int entindex , int iSsSlot , qboolean bTalking ) = 0;
 		virtual int				PlayerAudible( int audible ) = 0;
 		virtual void			InstallStringTableCallback( char const *tableName ) = 0;
-		virtual void			FrameStageNotify( ClientFrameStage_t curStage ) = 0;//37
+		virtual void			FrameStageNotify( ClientFrameStage_t curStage ) = 0;
 		virtual bool			DispatchUserMessage( int msg_type , int unk1 , int unk2 , bf_read &msg_data ) = 0;
 	};
 }

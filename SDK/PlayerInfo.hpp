@@ -19,6 +19,7 @@ namespace SDK
 		bool m_bIsHLTV;
 		DWORD m_dwCustomFiles[4];
 		BYTE m_FilesDownloaded;
+		char name[128];
 	private:
 		int __pad1;
 	};

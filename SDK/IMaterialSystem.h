@@ -13,7 +13,7 @@ namespace SDK
 		SHADER_PARAM_TYPE_VEC2,
 		SHADER_PARAM_TYPE_VEC3,
 		SHADER_PARAM_TYPE_VEC4,
-		SHADER_PARAM_TYPE_ENVMAP,	// obsolete
+		SHADER_PARAM_TYPE_ENVMAP,   // obsolete
 		SHADER_PARAM_TYPE_FLOAT,
 		SHADER_PARAM_TYPE_BOOL,
 		SHADER_PARAM_TYPE_FOURCC,
@@ -53,15 +53,15 @@ namespace SDK
 		MATERIAL_TRIANGLES,
 		MATERIAL_TRIANGLE_STRIP,
 		MATERIAL_LINE_STRIP,
-		MATERIAL_LINE_LOOP,	// a single line loop
-		MATERIAL_POLYGON,	// this is a *single* polygon
+		MATERIAL_LINE_LOOP, // a single line loop
+		MATERIAL_POLYGON,   // this is a *single* polygon
 		MATERIAL_QUADS,
 		MATERIAL_SUBD_QUADS_EXTRA, // Extraordinary sub-d quads
 		MATERIAL_SUBD_QUADS_REG,   // Regular sub-d quads
 		MATERIAL_INSTANCED_QUADS, // (X360) like MATERIAL_QUADS, but uses vertex instancing
 
 								  // This is used for static meshes that contain multiple types of
-								  // primitive types.	When calling draw, you'll need to specify
+								  // primitive types.   When calling draw, you'll need to specify
 								  // a primitive type.
 								  MATERIAL_HETEROGENOUS
 	};
@@ -75,10 +75,10 @@ namespace SDK
 
 	enum MaterialPropertyTypes_t
 	{
-		MATERIAL_PROPERTY_NEEDS_LIGHTMAP = 0,					// bool
-		MATERIAL_PROPERTY_OPACITY,								// int (enum MaterialPropertyOpacityTypes_t)
-		MATERIAL_PROPERTY_REFLECTIVITY,							// vec3_t
-		MATERIAL_PROPERTY_NEEDS_BUMPED_LIGHTMAPS				// bool
+		MATERIAL_PROPERTY_NEEDS_LIGHTMAP = 0,                   // bool
+		MATERIAL_PROPERTY_OPACITY,                              // int (enum MaterialPropertyOpacityTypes_t)
+		MATERIAL_PROPERTY_REFLECTIVITY,                         // vec3_t
+		MATERIAL_PROPERTY_NEEDS_BUMPED_LIGHTMAPS                // bool
 	};
 
 	// acceptable property values for MATERIAL_PROPERTY_OPACITY
@@ -97,8 +97,8 @@ namespace SDK
 
 	enum MaterialCullMode_t
 	{
-		MATERIAL_CULLMODE_CCW,	// this culls polygons with counterclockwise winding
-		MATERIAL_CULLMODE_CW	// this culls polygons with clockwise winding
+		MATERIAL_CULLMODE_CCW,  // this culls polygons with counterclockwise winding
+		MATERIAL_CULLMODE_CW    // this culls polygons with clockwise winding
 	};
 
 	enum MaterialIndexFormat_t
@@ -158,17 +158,17 @@ namespace SDK
 		MATERIAL_MAX_LIGHT_COUNT = 4,
 	};
 
-#define CREATERENDERTARGETFLAGS_HDR				0x00000001
-#define CREATERENDERTARGETFLAGS_AUTOMIPMAP		0x00000002
+#define CREATERENDERTARGETFLAGS_HDR             0x00000001
+#define CREATERENDERTARGETFLAGS_AUTOMIPMAP      0x00000002
 #define CREATERENDERTARGETFLAGS_UNFILTERABLE_OK 0x00000004
 
 	enum MorphFormatFlags_t
 	{
-		MORPH_POSITION = 0x0001,	// 3D
-		MORPH_NORMAL = 0x0002,	// 3D
-		MORPH_WRINKLE = 0x0004,	// 1D
-		MORPH_SPEED = 0x0008,	// 1D
-		MORPH_SIDE = 0x0010,	// 1D
+		MORPH_POSITION = 0x0001,    // 3D
+		MORPH_NORMAL = 0x0002,  // 3D
+		MORPH_WRINKLE = 0x0004, // 1D
+		MORPH_SPEED = 0x0008,   // 1D
+		MORPH_SIDE = 0x0010,    // 1D
 	};
 
 
@@ -187,8 +187,8 @@ namespace SDK
 
 	struct MaterialSystem_SortInfo_t
 	{
-		IMaterial	*material;
-		int			lightmapPageID;
+		IMaterial   *material;
+		int         lightmapPageID;
 	};
 
 
@@ -206,7 +206,7 @@ namespace SDK
 		unsigned int m_DeviceID;
 		unsigned int m_SubSysID;
 		unsigned int m_Revision;
-		int m_nDXSupportLevel;			// This is the *preferred* dx support level
+		int m_nDXSupportLevel;          // This is the *preferred* dx support level
 		int m_nMinDXSupportLevel;
 		int m_nMaxDXSupportLevel;
 		unsigned int m_nDriverVersionHigh;
@@ -249,22 +249,22 @@ namespace SDK
 	// the size of the framebuffer.
 	enum RenderTargetSizeMode_t
 	{
-		RT_SIZE_NO_CHANGE = 0,			// Only allowed for render targets that don't want a depth buffer
+		RT_SIZE_NO_CHANGE = 0,          // Only allowed for render targets that don't want a depth buffer
 										// (because if they have a depth buffer, the render target must be less than or equal to the size of the framebuffer).
-										RT_SIZE_DEFAULT = 1,				// Don't play with the specified width and height other than making sure it fits in the framebuffer.
-										RT_SIZE_PICMIP = 2,				// Apply picmip to the render target's width and height.
-										RT_SIZE_HDR = 3,					// frame_buffer_width / 4
-										RT_SIZE_FULL_FRAME_BUFFER = 4,	// Same size as frame buffer, or next lower power of 2 if we can't do that.
-										RT_SIZE_OFFSCREEN = 5,			// Target of specified size, don't mess with dimensions
+										RT_SIZE_DEFAULT = 1,                // Don't play with the specified width and height other than making sure it fits in the framebuffer.
+										RT_SIZE_PICMIP = 2,             // Apply picmip to the render target's width and height.
+										RT_SIZE_HDR = 3,                    // frame_buffer_width / 4
+										RT_SIZE_FULL_FRAME_BUFFER = 4,  // Same size as frame buffer, or next lower power of 2 if we can't do that.
+										RT_SIZE_OFFSCREEN = 5,          // Target of specified size, don't mess with dimensions
 										RT_SIZE_FULL_FRAME_BUFFER_ROUNDED_UP = 6 // Same size as the frame buffer, rounded up if necessary for systems that can't do non-power of two textures.
 	};
 
 	struct MaterialTextureInfo_t
 	{
 		// Exclude information:
-		//		-1	texture is not subject to exclude-handling
-		//		 0	texture is completely excluded
-		//		>0	texture is clamped according to exclude-instruction
+		//      -1  texture is not subject to exclude-handling
+		//       0  texture is completely excluded
+		//      >0  texture is clamped according to exclude-instruction
 		int iExcludeInformation;
 	};
 
