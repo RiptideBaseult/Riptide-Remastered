@@ -22,27 +22,27 @@ namespace DynSkin
 		class CFile
 		{
 		public:
-			CFile( void );
-			virtual                             ~CFile( void );
-			bool                                Load( const string& path , bool isunicode = false );
+			CFile(void);
+			virtual                             ~CFile(void);
+			bool                                Load(const string& path, bool isunicode = false);
 
-			void                                Release( void );
-			szPos                               FindFirstOf( const string& search , szPos start , szPos end );
-			vecPos                              FindAllOf( const string& search , szPos start , szPos end , vecPos pos = vecPos() );
-			string                         GetStringAt( szPos start , szSize length );
-			string                         GetStringBetween( szPos start , szPos end );
-			inline const string&     GetPath( void ) { return _path; }
-			inline const vecFile&         GetFile( void ) { return _file; }
-			inline const szPos&           GetFileSize( void ) { return _file.size(); }
-			inline const char&            at( size_t p ) { return _file.at( p ); }
+			void                                Release(void);
+			szPos                               FindFirstOf(const string& search, szPos start, szPos end);
+			vecPos                              FindAllOf(const string& search, szPos start, szPos end, vecPos pos = vecPos());
+			string                         GetStringAt(szPos start, szSize length);
+			string                         GetStringBetween(szPos start, szPos end);
+			inline const string&     GetPath(void) { return _path; }
+			inline const vecFile&         GetFile(void) { return _file; }
+			inline const szPos&           GetFileSize(void) { return _file.size(); }
+			inline const char&            at(size_t p) { return _file.at(p); }
 		private:
-			virtual bool Parse( void ) = 0;
+			virtual bool Parse(void) = 0;
 
-			inline bool CompareBytes( char* pszData , const char* pszPattern )
+			inline bool CompareBytes(char* pszData, const char* pszPattern)
 			{
-				for ( auto i = 0; *pszPattern; ++pszPattern , ++i )
+				for (auto i = 0; *pszPattern; ++pszPattern, ++i)
 				{
-					if ( pszData[i] != *pszPattern )
+					if (pszData[i] != *pszPattern)
 					{
 						return false;
 					}
@@ -62,18 +62,18 @@ namespace DynSkin
 		{
 			class CLevel;
 
-			typedef multimap< string , CLevel* >        mapLevel;
-			typedef unordered_map< string , string >    mapVariable;
+			typedef multimap< string, CLevel* >        mapLevel;
+			typedef unordered_map< string, string >    mapVariable;
 
 			class CLevel
 			{
 			public:
 
-				CLevel( szPos& start , CFile* file );
-				~CLevel( void );
+				CLevel(szPos& start, CFile* file);
+				~CLevel(void);
 
-				inline const mapLevel&        GetSubLevels( void ) { return _sublevels; }
-				inline const mapVariable&     GetVariables( void ) { return _variables; }
+				inline const mapLevel&        GetSubLevels(void) { return _sublevels; }
+				inline const mapVariable&     GetVariables(void) { return _variables; }
 			protected:
 				szPos                               _start = 0;            // abs. pos start
 				szPos                               _end = 0;            // abs. pos end
@@ -84,11 +84,11 @@ namespace DynSkin
 			class CConfig : public CFile
 			{
 			public:
-				CConfig( void );
-				~CConfig( void );
-				inline CLevel*                      GetLevel( void ) { return _level; }
+				CConfig(void);
+				~CConfig(void);
+				inline CLevel*                      GetLevel(void) { return _level; }
 			private:
-				bool                                Parse( void );
+				bool                                Parse(void);
 			protected:
 				CLevel*                             _level = 0;            // Level
 			};
@@ -106,26 +106,26 @@ namespace DynSkin
 		};
 
 		typedef vector<SkinInfo_t> vecSkinInfo;
-		typedef unordered_map<string , vecSkinInfo> mapSkinInfo;
+		typedef unordered_map<string, vecSkinInfo> mapSkinInfo;
 
 		class CSkins
 		{
 		public:
-			CSkins( void );
-			~CSkins( void );
-			bool								DumpTable( File::Valve::mapLevel tab , File::Valve::mapVariable vt , File::Valve::mapLevel ai_wi );
+			CSkins(void);
+			~CSkins(void);
+			bool								DumpTable(File::Valve::mapLevel tab, File::Valve::mapVariable vt, File::Valve::mapLevel ai_wi);
 
-			bool                                Load( const string& gamePath , const string& gameShortName );
-			void                                Release( void );
+			bool                                Load(const string& gamePath, const string& gameShortName);
+			void                                Release(void);
 
-			mapSkinInfo GetSkinInfo( void ) { return _skininfo; }
-			vecSkinInfo GetSkinInfoByWeapon( const string& weapon )
+			mapSkinInfo GetSkinInfo(void) { return _skininfo; }
+			vecSkinInfo GetSkinInfoByWeapon(const string& weapon)
 			{
-				auto ret = _skininfo.find( weapon );
-				
-				if ( ret != _skininfo.end() )
+				auto ret = _skininfo.find(weapon);
+
+				if (ret != _skininfo.end())
 					return ret->second;
-				
+
 				return vecSkinInfo();
 			}
 

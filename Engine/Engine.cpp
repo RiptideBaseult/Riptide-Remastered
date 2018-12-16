@@ -10,12 +10,7 @@ namespace Engine
 {
 	bool Initialize()
 	{
-		/*#if ENABLE_LICENSING == 1
-		if ( !License.CheckLicense() )
-		{
-			return false;
-		}
-		#endif*/
+	
 		
 		if ( !CSX::Utils::IsModuleLoad( CLIENT_DLL , 45000 ) )
 			return false;
@@ -52,12 +47,7 @@ namespace Engine
 			return false;
 		}
 
-		/*
-		if ( !SDK::Interfaces::Input() )
-		{
-			return false;
-		}
-		*/
+		
 
 		if ( !SDK::Interfaces::EngineTrace() )
 		{
@@ -130,6 +120,58 @@ namespace Engine
 		return true;
 	}
 
+	bool bSendPacket = true;
+
+	void NormalizeAngles(QAngle& angles)
+	{
+		for (auto i = 0; i < 3; i++) {
+			while (angles[i] < -180.0f) angles[i] += 360.0f;
+			while (angles[i] >  180.0f) angles[i] -= 360.0f;
+		}
+	}
+	//------------------------------------------------------------------------------—
+	void ClampAngles(QAngle& angles)
+	{
+		if (angles.x > 89.0f) angles.x = 89.0f;
+		else if (angles.x < -89.0f) angles.x = -89.0f;
+
+		if (angles.y > 180.0f) angles.y = 180.0f;
+		else if (angles.y < -180.0f) angles.y = -180.0f;
+
+		angles.z = 0;
+	}
+	void CorrectMovement(QAngle vOldAngles, CUserCmd* cmd, float fOldForward, float fOldSidemove)
+	{
+		
+		float deltaView;
+		float f1;
+		float f2;
+
+		if (vOldAngles.y < 0.f)
+			f1 = 360.0f + vOldAngles.y;
+		else
+			f1 = vOldAngles.y;
+
+		if (cmd->viewangles.y < 0.0f)
+			f2 = 360.0f + cmd->viewangles.y;
+		else
+			f2 = cmd->viewangles.y;
+
+		if (f2 < f1)
+			deltaView = abs(f2 - f1);
+		else
+			deltaView = 360.0f - abs(f1 - f2);
+
+		deltaView = 360.0f - deltaView;
+
+		cmd->forwardmove = cos(DEG2RAD(deltaView)) * fOldForward + cos(DEG2RAD(deltaView + 90.f)) * fOldSidemove;
+		cmd->sidemove = sin(DEG2RAD(deltaView)) * fOldForward + sin(DEG2RAD(deltaView + 90.f)) * fOldSidemove;
+	}
+
+
+
+
+
 	void Shutdown()
 	{
 		Hook::Shutdown();
@@ -162,13 +204,11 @@ namespace Engine
 			return WEAPON_TYPE_SHOTGUN;
 		case WEAPON_M249:
 			return WEAPON_TYPE_SHOTGUN;
-		case WEAPON_M4A4:
+		case WEAPON_M4A1:
 			return WEAPON_TYPE_SHOTGUN;
 		case WEAPON_MAC10:
 			return WEAPON_TYPE_SHOTGUN;
 		case WEAPON_P90:
-			return WEAPON_TYPE_SHOTGUN;
-		case WEAPON_MP5:
 			return WEAPON_TYPE_SHOTGUN;
 		case WEAPON_UMP45:
 			return WEAPON_TYPE_SHOTGUN;
@@ -248,14 +288,6 @@ namespace Engine
 			return WEAPON_TYPE_KNIFE;
 		case WEAPON_KNIFE_PUSH:
 			return WEAPON_TYPE_KNIFE;
-		case WEAPON_KNIFE_NAVAJA:
-			return WEAPON_TYPE_KNIFE;
-		case WEAPON_KNIFE_STILETTO:
-			return WEAPON_TYPE_KNIFE;
-		case WEAPON_KNIFE_URSUS:
-			return WEAPON_TYPE_KNIFE;
-		case WEAPON_KNIFE_TALON:
-			return WEAPON_TYPE_KNIFE;
 		default:
 			return WEAPON_TYPE_UNKNOWN;
 		}
@@ -275,6 +307,197 @@ namespace Engine
 		return false;
 	}
 
+	void SetMyClanTag(const char* tag, const char* name)
+	{
+		static auto pSetClanTag = reinterpret_cast<void(__fastcall*)(const char*, const char*)>(((DWORD)CSX::Memory::FindPatternV2("engine.dll", "53 56 57 8B DA 8B F9 FF 15")));
+		pSetClanTag(tag, name);
+	}
+
+	void ClanTag()
+	{
+		CBaseEntity* pPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+
+		static int counter = 0;
+
+		int value = Settings::Misc::misc_Clan;
+
+		switch (value)
+		{
+		case 1:
+		{
+			SetMyClanTag("", "");
+			break;
+		}
+		case 2:
+		{
+			SetMyClanTag("\r", "No Name");
+			break;
+		}
+		case 3:
+		{
+			SetMyClanTag("riptide", "Riptide");
+			break;
+		}
+		case 4:
+		{
+			SetMyClanTag("riptide \r", "Riptide Only");
+			break;
+		}
+		case 5:
+		{
+			SetMyClanTag("[VALV\xE1\xB4\xB1]", "Valve");
+			break;
+		}
+		case 6:
+		{
+			SetMyClanTag("[VALV\xE1\xB4\xB1] \r", "Valve Only");
+			break;
+		}
+		case 7:
+		{
+			SetMyClanTag("Baseult", "Baseult");
+			break;
+		}
+		case 8:
+		{
+			static int motion = 0;
+			if (counter % 48 == 0)
+				motion++;
+
+			int ServerTime = (float)pPlayer->GetTickBase() * Interfaces::GlobalVars()->interval_per_tick;
+
+			int value = ServerTime % 19;
+			switch (value)
+			{
+			case 0:
+			{
+				SetMyClanTag("", "Animation");
+				break;
+			}
+			case 1:
+			{
+				SetMyClanTag("r", "Animation");
+				break;
+			}
+			case 2:
+			{
+				SetMyClanTag("ri", "Animation");
+				break;
+			}
+			case 3:
+			{
+				SetMyClanTag("rip", "Animation");
+				break;
+			}
+			case 4:
+			{
+				SetMyClanTag("ript", "Animation");
+				break;
+			}
+			case 5:
+			{
+				SetMyClanTag("ripti", "Animation");
+				break;
+			}
+			case 6:
+			{
+				SetMyClanTag("riptid", "Animation");
+				break;
+			}
+			case 7:
+			{
+				SetMyClanTag("riptide", "Animation");
+				break;
+			}
+			case 8:
+			{
+				SetMyClanTag("riptide", "Animation");
+				break;
+			}
+			case 9:
+			{
+				SetMyClanTag("riptide", "Animation");
+				break;
+			}
+			case 10:
+			{
+				SetMyClanTag("ripti", "Animation");
+				break;
+			}
+			case 11:
+			{
+				SetMyClanTag("ript", "Animation");
+				break;
+			}
+			case 12:
+			{
+				SetMyClanTag("rip", "Animation");
+				break;
+			}
+			case 13:
+			{
+				SetMyClanTag("ri", "Animation");
+				break;
+			}
+			case 14:
+			{
+				SetMyClanTag("r", "Animation");
+				break;
+			}
+			case 15:
+			{
+				SetMyClanTag("", "Animation");
+				break;
+			}
+			case 16:
+			{
+				SetMyClanTag("riptide", "Animation");
+				break;
+			}
+			case 17:
+			{
+				SetMyClanTag("by", "Animation");
+				break;
+			}
+			case 18:
+			{
+				SetMyClanTag("Baseult", "Animation");
+				break;
+			}
+			}
+			counter++;
+		}
+		break;
+		}
+	}
+	void ChatSpamRegular()
+	{
+		std::vector<std::string> chatspam = { "riptide remastered | best cs:go legit cheat" };
+		static DWORD lastspammed = 0;
+		if (GetTickCount() - lastspammed > 800)
+		{
+			lastspammed = GetTickCount();
+			auto say = "say ";
+			std::string msg = say + chatspam[rand() % chatspam.size()];
+			Interfaces::Engine()->ExecuteClientCmd(msg.c_str());
+		}
+	}
+
+	void ChatSpamRandom()
+	{
+		std::vector<std::string> chatspamsss = { "riptide remastered | best cs:go legit cheat" , "The only thing lower than your k/d ratio is your I.Q." , "i'm using riptide remastered" , "suck my cock you silver bastards" , "Your aim is so poor that people held a fundraiser for it" , "you're getting fucked by riptide remastered right now" , "The only thing more unreliable than you is the condom your dad used." , "look at you trash got killed by riptide remastered" , "Calling you a retard is a compliment in comparison to how stupid you actually are" , "How many tries did it take for you to click the install button?" , "If I jumped from your ego to your intelligence, Id die of starvation half-way down." , "When I die I want you to to lower me in my grave so you can let me down one more time." , "Friendly fire was invented because of you" };
+
+
+		static DWORD lastspammed = 0;
+		if (GetTickCount() - lastspammed > 800)
+		{
+			lastspammed = GetTickCount();
+			auto say = "say ";
+			std::string msg = say + chatspamsss[rand() % chatspamsss.size()];
+			Interfaces::Engine()->ExecuteClientCmd(msg.c_str());
+		}
+	}
+
 	void ForceFullUpdate()
 	{
 		if (Client::g_pSkin)
@@ -288,7 +511,7 @@ namespace Engine
 		ForceUpdate FullUpdate = (ForceUpdate)CSX::Memory::FindSignature("engine.dll", "FullUpdate", "A1 ? ? ? ? B9 ? ? ? ? 56 FF 50 14 8B 34 85");
 		FullUpdate();
 	}
-	
+
 	int GetWeaponSettingsSelectID()
 	{
 		for (size_t i = 0; i < WEAPON_DATA_SIZE; i++)
@@ -298,6 +521,12 @@ namespace Engine
 		}
 
 		return -1;
+	}
+
+
+	void ClanTagApply(const char* TagName)
+	{
+		SetMyClanTag(TagName, "Riptide");
 	}
 
 	bool ScanColorFromCvar( const char* str , float* colors )
@@ -383,7 +612,6 @@ namespace Engine
 
 		return false;
 	}
-
 	void AngleVectors( const Vector &vAngles , Vector& vForward )
 	{
 		float	sp , sy , cp , cy;
@@ -450,6 +678,43 @@ namespace Engine
 			vAngles.y += 360.f;
 		vAngles.z = 0;
 	}
+
+	void SinCos(float a, float* s, float*c)
+	{
+		*s = sin(a);
+		*c = cos(a);
+	}
+
+	void AngleVectors2(const Vector &angles, Vector *forward, Vector *right, Vector *up)
+	{
+		float sr, sp, sy, cr, cp, cy;
+
+		SinCos(DEG2RAD(angles[1]), &sy, &cy);
+		SinCos(DEG2RAD(angles[0]), &sp, &cp);
+		SinCos(DEG2RAD(angles[2]), &sr, &cr);
+
+		if (forward)
+		{
+			forward->x = cp * cy;
+			forward->y = cp * sy;
+			forward->z = -sp;
+		}
+
+		if (right)
+		{
+			right->x = (-1 * sr*sp*cy + -1 * cr*-sy);
+			right->y = (-1 * sr*sp*sy + -1 * cr*cy);
+			right->z = -1 * sr*cp;
+		}
+
+		if (up)
+		{
+			up->x = (cr*sp*cy + -sr * -sy);
+			up->y = (cr*sp*sy + -sr * cy);
+			up->z = cr * cp;
+		}
+	}
+
 
 	void SmoothAngles( Vector MyViewAngles , Vector AimAngles , Vector &OutAngles , float Smoothing )
 	{
@@ -562,7 +827,8 @@ namespace Engine
 		pCreatedMaterial->IncrementReferenceCount();
 		return pCreatedMaterial;
 	}
-//[enc_string_enable /]
+//[enc_string_enable 
+
 	void ForceMaterial( Color color , IMaterial* material , bool useColor , bool forceMaterial )
 	{
 		if ( useColor )
@@ -629,6 +895,8 @@ namespace Engine
 		FindClose( hSearch );
 		return TRUE;
 	}
+
+
 }
 
 bool CTimer::delay( DWORD dwMsec )

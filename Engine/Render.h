@@ -28,14 +28,12 @@ namespace Engine
 
 		void DrawLine( int x1 , int y1 , int x2 , int y2 , Color color );
 
-		void Circle(float x, float y, float r, float s, Color color);
+		void DrawWave1(Vector loc, float radius, Color color);
 
 		void Line(Vector2D start_pos, Vector2D end_pos, Color col);
-		void DrawWave1(Vector loc, float radius, Color color);
-		void DrawCircle(Vector2D position, float points, float radius, Color color);
 
-		void GenuineBox(int x, int y, int w, int h, Color color);
-		void GenuineOutlineBox(int x, int y, int w, int h, Color color);
+		void Circle(Vector2D position, float points, float radius, Color color);
+		void DrawCircle3D(Vector position, float points, float radius, Color color);
 
 		void DrawBox( int x , int y , int w , int h , Color color );
 		void DrawFillBox( int x , int y , int w , int h , Color color );
@@ -44,13 +42,22 @@ namespace Engine
 		void DrawCoalBox( int x , int y , int w , int h , Color color );
 		void DrawOutlineCoalBox( int x , int y , int w , int h , Color color );
 
+		void GenuineBox(int x, int y, int w, int h, Color color);
+		void GenuineOutlineBox(int x, int y, int w, int h, Color color);
+
+		void DrawOctagonBox(int x, int y, int w, int h, Color color);
+		void DrawOctagonOutlineBox(int x, int y, int w, int h, Color color);
+		void DrawOctagonCoalBox(int x, int y, int w, int h, Color color);
+
+		void DrawAlphaBox(int x, int y, int w, int h, Color color);
+		void DrawOutlineFillBox(int x, int y, int w, int h, Color color);
+
 		void DrawWindow( int x , int y , int w , int h , Color Border , Color Background );
 
 		void DrawHorBar( int x , int y , int w , int h , int val , Color color1 , Color color2 );
 		void DrawVerBar( int x , int y , int w , int h , int val , Color color1 , Color color2 );
 		
 		void Text( int x , int y , bool center , bool shadow , Color color , const char* format , ... );
-		void TextToConsole(int x, int y, bool center, bool shadow, Color color, const char * format, ...);
 		void WepIcon(int x, int y, bool center, bool shadow, Color color, const char* format, ...);
 //[/swap_lines]
 		IDirect3DDevice9*		m_pDevice;
@@ -59,21 +66,18 @@ namespace Engine
 //[swap_lines]
 		bool CreateObject();
 
-		int GetTextHeight(const char * text);
-
 		void SetVertexState();
 
 		void CreateVertex( int x , int y , DWORD dxColor , PD3DTLVERTEX pVertext , DWORD index );
 
 		ID3DXFont*				m_pFont;
 		ID3DXFont*				m_pIconz;
-		ID3DXFont*				m_pLog;
 		CHudTexture*			m_pIcon;		// 0x724
 		IDirect3DStateBlock9*	m_pStateBlockDraw;
 		IDirect3DStateBlock9*	m_pStateBlockText;
 
 		DWORD					dwOld_D3DRS_COLORWRITEENABLE;
-//[/swap_lines]
+		//[/swap_lines]
 	};
 
 	namespace D3D9

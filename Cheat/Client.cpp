@@ -1,42 +1,91 @@
+﻿
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//																																				//
+//																	CREDITS:																	//					
+//																																				//
+//											Riptide founded and coded by Baseult https://www.unknowncheats.me/forum/members/2604732.html		//
+//											Riptide founded and coded by mitch 																    //
+//											Riptide founded and coded by Swifty 																//
+//											Riptide founded and coded by undetected 															//
+//											Riptide founded and coded by karmafreediet 															//
+//											Riptide coded by vsonyp0wer 																		//
+//																																			    //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+//------------------------------------Includes---------------------------------------------------------------------------
+
+#include <chrono>
+#include <ctime>
+#include <stdint.h>
+#include <Shlobj.h>
+
 #include "Client.h"
-#include "GranadeHelper/CGrenadeAPI.h"
+#include "../ImGui/imgui.h"
+#include "Ragebot/Ragebot.h"
+#include "../ConfigPop/cfgmsgpop.h"
+#include "../Cheat/GrenadeHelper/CGrenadeAPI.h"
+
+
+
 //[enc_string_enable /]
 //[junk_enable /]
 
-ImFont*  bigFont = nullptr;
+
+//-------------------------------Client-------------------------------------------------------------------------------------
 
 namespace Client
 {
-	//[swap_lines]
-	int	iScreenWidth = 0;
-	int	iScreenHeight = 0;
-
 	string BaseDir = "";
 	string LogFile = "";
 	string GuiFile = "";
 	string IniFile = "";
 
+	int	iScreenWidth = 0;
+	int	iScreenHeight = 0;
+
+	char* username = getenv("USERPROFILE");
+
 	vector<string> ConfigList;
 
 	Vector2D	g_vCenterScreen = Vector2D(0.f, 0.f);
 
+
+	CKnifebot*	g_pKnifebot = nullptr;
+	CResolver*  g_pResolver = nullptr;
+	CFakeLag*   g_pFakeLag = nullptr;
+	CAntiAim*   g_pAntiAim = nullptr;
 	CPlayers*	g_pPlayers = nullptr;
 	CRender*	g_pRender = nullptr;
-	CGui*		g_pGui = nullptr;
-
 	CAimbot*	g_pAimbot = nullptr;
-	CEsp*		g_pEsp = nullptr;
 	CRadar*		g_pRadar = nullptr;
 	CSkin*		g_pSkin = nullptr;
 	CMisc*		g_pMisc = nullptr;
+	CGui*		g_pGui = nullptr;
+	CEsp*		g_pEsp = nullptr;
+
+	CInventoryChanger1* g_pInventoryChanger1 = nullptr;
+	CInventoryChanger* g_pInventoryChanger = nullptr;
+
+
+	std::shared_ptr<CRageBot> RageBot = std::shared_ptr<CRageBot>(new CRageBot());
 
 	bool		bC4Timer = false;
 	int			iC4Timer = 40;
 
-	int			iWeaponID = 0;
 	int			iWeaponSelectIndex = WEAPON_DEAGLE;
 	int			iWeaponSelectSkinIndex = -1;
-	//[/swap_lines]
+	int			iWeaponID = 0;
+
+	float watermarkRainbowSpeed = 0.005f;
+	float watermarkScrollSpeed = 2.5f;
+
+
+	//---------------------------------ConigSettings-----------------------------------------------------------------------------------
 
 	void ReadConfigs(LPCTSTR lpszFileName)
 	{
@@ -45,30 +94,49 @@ namespace Client
 			ConfigList.push_back(lpszFileName);
 		}
 	}
-
 	void RefreshConfigs()
 	{
 		ConfigList.clear();
-		string ConfigDir = "C:\\Champion\\*.ini";
+		string ConfigDir = BaseDir + "\\" + "*.Riptide";
+		GuiFile = BaseDir + "\\" + "gui.Riptide";
+		CreateDirectoryW(L"C:\\Riptide", NULL);
 		SearchFiles(ConfigDir.c_str(), ReadConfigs, FALSE);
 	}
+
+
+
+	//--------------------------------------InitializeClient----------------------------------------------------------------
+
 
 	bool Initialize(IDirect3DDevice9* pDevice)
 	{
 
-		g_pPlayers = new CPlayers();
-		g_pRender = new CRender(pDevice);
-		g_pGui = new CGui();
 
+		g_pRender = new CRender(pDevice);
+		g_pKnifebot = new CKnifebot();
+		g_pResolver = new CResolver();
+		g_pAntiAim = new CAntiAim();
+		g_pFakeLag = new CFakeLag();
+		g_pPlayers = new CPlayers();
 		g_pAimbot = new CAimbot();
-		g_pEsp = new CEsp();
 		g_pRadar = new CRadar();
 		g_pSkin = new CSkin();
 		g_pMisc = new CMisc();
+		g_pGui = new CGui();
+		g_pEsp = new CEsp();
 
-		CreateDirectoryW(L"C:\\Champion", NULL);
-		GuiFile = "C:\\Champion\\gui.ini";
-		IniFile = "C:\\Champion\\settings.ini";
+		g_pInventoryChanger = new CInventoryChanger();
+
+
+		//-------------------------ConfigSettings-------------------------------------------------------------------------------
+
+		CHAR my_documents[MAX_PATH];
+		if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, my_documents)))
+		{
+			CreateDirectoryW(L"C:\\riptide-remastered", NULL);
+			GuiFile = "C:/riptide-remastered/gui.ini";
+			IniFile = BaseDir + "\\" + "settings.ini";
+		}
 
 		g_pSkin->InitalizeSkins();
 
@@ -83,27 +151,54 @@ namespace Client
 		return true;
 	}
 
+	//--------------------------------Shutdown-------------------------------------------------------------------------------
+
 	void Shutdown()
 	{
-		DELETE_MOD(g_pPlayers);
-		DELETE_MOD(g_pRender);
-		DELETE_MOD(g_pGui);
 
+		DELETE_MOD(g_pKnifebot);
+		DELETE_MOD(g_pResolver);
+		DELETE_MOD(g_pFakeLag);
+		DELETE_MOD(g_pAntiAim);
+		DELETE_MOD(g_pPlayers);
 		DELETE_MOD(g_pAimbot);
-		DELETE_MOD(g_pEsp);
+		DELETE_MOD(g_pRender);
 		DELETE_MOD(g_pRadar);
 		DELETE_MOD(g_pSkin);
 		DELETE_MOD(g_pMisc);
+		DELETE_MOD(g_pGui);
+		DELETE_MOD(g_pEsp);
 	}
+
+
+	//------------------------------FPSCOUNTER--------------------------------------------------------------------------------
 
 	int get_fps()
 	{
-		return 0;
+		using namespace std::chrono;
+		static int count = 0;
+		static auto last = high_resolution_clock::now();
+		auto now = high_resolution_clock::now();
+		static int fps = 0;
+
+		count++;
+
+		if (duration_cast<milliseconds>(now - last).count() > 1000)
+		{
+			fps = count;
+			count = 0;
+			last = now;
+		}
+		return fps;
 	}
+
+
+	//-----------------------------------OnRender-----------------------------------------------------------------------------------
 
 	void OnRender()
 	{
-		if (g_pRender && !Interfaces::Engine()->IsTakingScreenshot() && Interfaces::Engine()->IsActiveApp())
+		// if (g_pRender && !Interfaces::Engine()->IsTakingScreenshot() && Interfaces::Engine()->IsActiveApp()) //Disables GUI for screenshots
+		if (g_pRender && Interfaces::Engine()->IsActiveApp())
 		{
 			g_pRender->BeginRender();
 
@@ -115,57 +210,116 @@ namespace Client
 			g_vCenterScreen.x = iScreenWidth / 2.f;
 			g_vCenterScreen.y = iScreenHeight / 2.f;
 
-			float watermarkRainbowSpeed = 0.005f;
-			float watermarkScrollSpeed = 2.5f;
 
-			EventLog->DrawLogs();
+			//------------------------LegitAAWarnings------------------------------------------------------------------
+
+			/*if (Settings::Esp::esp_legitAAWarnings)
+			{
+				static bool left;
+				if (GetAsyncKeyState(VK_RIGHT))
+					left = true;
+				else if (GetAsyncKeyState(0x44))
+					left = true;
+
+				else if (GetAsyncKeyState(VK_LEFT))
+					left = false;
+				else if (GetAsyncKeyState(0x41))
+					left = false;
+
+				if (left)
+					g_pRender->Text(15, 650, false, true, Color::SkyBlue(), LEGITAALEFT);
+				else if (!left)
+					g_pRender->Text(15, 650, false, true, Color::SkyBlue(), LEGITAARIGHT);
+			}*/
+
+			//----------------------------Watermark-----------------------------------------------------------------------
 
 			if (Settings::Esp::esp_Watermark)
 			{
+				//bool rainbow; 
 				static float rainbow;
 				rainbow += watermarkRainbowSpeed;
 				if (rainbow > 1.f) rainbow = 0.f;
 				static int u = 0;
-				if (u <= 100)                g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "<>ChampionWare");
-				if (u > 100 && u <= 200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "e<>ChampionWar");
-				if (u > 200 && u <= 300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "re<>ChampionWa");
-				if (u > 300 && u <= 400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "are<>ChampionW");
-				if (u > 400 && u <= 500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Ware<>Champion");
-				if (u > 500 && u <= 600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "nWare<>Champio");
-				if (u > 600 && u <= 700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "onWare<>Champi");
-				if (u > 700 && u <= 800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "ionWare<>Champ");
-				if (u > 800 && u <= 900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "pionWare<>Cham");
-				if (u > 900 && u <= 1000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "mpionWare<>Cha");
-				if (u > 1000 && u <= 1100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "empionWare<>Ch");
-				if (u > 1100 && u <= 1200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "hempionWare<>C");
-				if (u > 1200 && u <= 1300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "ChampionWare<>");
-				if (u > 1300 && u <= 1400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), ">ChampionWare<");
-				if (u > 1400 && u <= 1500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), ">ChampionWare<");
-				if (u > 1500 && u <= 1600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), ">ChampionWare<");
-				if (u > 1600 && u <= 1700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "<>ChampionWare");
-				if (u > 1700 && u <= 1800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "e<>ChampionWar");
-				if (u > 1800 && u <= 1900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "re<>ChampionWa");
-				if (u > 1900 && u <= 2000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "are<>ChampionW");
-				if (u > 2000 && u <= 2100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Ware<>Champion");
-				if (u > 2100 && u <= 2200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "nWare<>Champio");
-				if (u > 2200 && u <= 2300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "onWare<>Champi");
-				if (u > 2300 && u <= 2400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "ionWare<>Champ");
-				if (u > 2400 && u <= 2500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "pionWare<>Cham");
-				if (u > 2500 && u <= 2600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "mpionWare<>Cha");
-				if (u > 2600 && u <= 2700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "empionWare<>Ch");
-				if (u > 2700 && u <= 2800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "hempionWare<>C");
-				if (u > 2800 && u <= 2900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "ChampionWare<>");
-				if (u > 2900 && u <= 3000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), ">ChampionWare<");
-				if (u > 3000 && u <= 3100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), ">ChampionWare<");
-				if (u > 3100 && u <= 3200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), ">ChampionWare<");
+				if (u <= 100)                g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered");
+				if (u > 100 && u <= 200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered");
+				if (u > 200 && u <= 300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered");
+				if (u > 300 && u <= 400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: c");
+				if (u > 400 && u <= 500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: co");
+				if (u > 500 && u <= 600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: cod");
+				if (u > 600 && u <= 700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: code");
+				if (u > 700 && u <= 800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded");
+				if (u > 800 && u <= 900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded ");
+				if (u > 900 && u <= 1000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded b");
+				if (u > 1000 && u <= 1100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded by");
+				if (u > 1100 && u <= 1200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded by");
+				if (u > 1200 && u <= 1300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded by B");
+				if (u > 1300 && u <= 1400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded by Ba");
+				if (u > 1400 && u <= 1500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: coded by Bas");
+				if (u > 1500 && u <= 1600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: oded by Base");
+				if (u > 1600 && u <= 1700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ded by Baseu");
+				if (u > 1700 && u <= 1800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ed by Baseul");
+				if (u > 1800 && u <= 1900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: d by Baseult");
+				if (u > 1900 && u <= 2000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  by Baseult,");
+				if (u > 2000 && u <= 2100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: by Baseult, ");
+				if (u > 2100 && u <= 2200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: y Baseult, S");
+				if (u > 2200 && u <= 2300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  Baseult, Sw");
+				if (u > 2300 && u <= 2400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: Baseult, Swi");
+				if (u > 2400 && u <= 2500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: aseult, Swif");
+				if (u > 2500 && u <= 2600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: seult, Swift");
+				if (u > 2600 && u <= 2700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: eult, Swifty");
+				if (u > 2700 && u <= 2800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ult, Swifty,");
+				if (u > 2800 && u <= 2900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: lt, Swifty, ");
+				if (u > 2900 && u <= 3000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: t, Swifty, m");
+				if (u > 3000 && u <= 3100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: , Swifty, mi");
+				if (u > 3100 && u <= 3200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  Swifty, mit");
+				if (u > 3200 && u <= 3300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: Swifty, mitc");
+				if (u > 3300 && u <= 3400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: wifty, mitch");
+				if (u > 3400 && u <= 3500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ifty, mitch,");
+				if (u > 3500 && u <= 3600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: fty, mitch, ");
+				if (u > 3600 && u <= 3700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ty, mitch, v");
+				if (u > 3700 && u <= 3800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: y, mitch, vs");
+				if (u > 3800 && u <= 3900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: , mitch, vso");
+				if (u > 3900 && u <= 4000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  mitch, vson");
+				if (u > 4000 && u <= 4100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: mitch, vsony");
+				if (u > 4100 && u <= 4200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: itch, vsonyp");
+				if (u > 4200 && u <= 4300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ich, vsonyp0");
+				if (u > 4300 && u <= 4400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: ch, vsonyp0w");
+				if (u > 4400 && u <= 4500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: h, vsonyp0we");
+				if (u > 4500 && u <= 4600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: , vsonyp0wer");
+				if (u > 4600 && u <= 4700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  vsonyp0wer ");
+				if (u > 4700 && u <= 4800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: vsonyp0wer  ");
+				if (u > 4800 && u <= 4900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: sonyp0wer   ");
+				if (u > 4900 && u <= 5000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: onyp0wer    ");
+				if (u > 5000 && u <= 5100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: nyp0wer    ");
+				if (u > 5100 && u <= 5200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: yp0wer     ");
+				if (u > 5200 && u <= 5300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: p0wer       ");
+				if (u > 5300 && u <= 5400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: 0wer        ");
+				if (u > 5400 && u <= 5500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: wer         ");
+				if (u > 5500 && u <= 5600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: r           ");
+				if (u > 5600 && u <= 5700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:             ");
+				if (u > 5700 && u <= 5800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: Baseult");
+				if (u > 5800 && u <= 5900)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: Baseult ");
+				if (u > 5900 && u <= 6000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  ");
+				if (u > 6000 && u <= 6100)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: Swifty");
+				if (u > 6100 && u <= 6200)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: Swifty");
+				if (u > 6200 && u <= 6300)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:  ");
+				if (u > 6300 && u <= 6400)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: mitch");
+				if (u > 6400 && u <= 6500)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: mitch");
+				if (u > 6500 && u <= 6600)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered:   ");
+				if (u > 6600 && u <= 6700)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: vsonyp0wer");
+				if (u > 6700 && u <= 6800)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered: vsonyp0wer");
+				if (u > 6800 && u <= 15000)    g_pRender->Text(15, 15, false, true, Color::FromHSB(rainbow, 1.f, 1.f), "Riptide Remastered");
 				u += watermarkScrollSpeed;
-				if (u > 3200) u = 0;
+				if (u > 15000) u = 0;
 			}
 
-			if (Settings::Esp::esp_Cheatbuild)
-				g_pRender->Text(15, 35, false, true, Color::White(), "latest build: %s : %s", __DATE__, __TIME__);
 
-			if (Client::g_pPlayers && Client::g_pPlayers->GetLocal() && Interfaces::Engine()->IsInGame())
+			if (Settings::Esp::esp_Cheatbuild)
+				g_pRender->Text(15, 45, false, true, Color::White(), "latest build: %s : %s", __DATE__, __TIME__);
+
+
+
 			{
 				if (g_pEsp)
 					g_pEsp->OnRender();
@@ -177,15 +331,14 @@ namespace Client
 				}
 			}
 
-			if (Settings::Misc::misc_Spectators && Interfaces::Engine()->IsInGame())
-			{
-				g_pRender->Text(15, 500, false, true, Color::White(), "Spectators List:");
-				g_pRender->Text(15, 501, false, true, Color::White(), "______________");
-			}
+			std::time_t result = std::time(nullptr);
+
+
 
 			g_pRender->EndRender();
 		}
 	}
+
 
 	void OnLostDevice()
 	{
@@ -205,15 +358,32 @@ namespace Client
 			ImGui_ImplDX9_CreateDeviceObjects();
 	}
 
+	//--------------------------------Inventorychanger-------------------------------------------------------------------------------
 
-	void OnCreateMove(CUserCmd* pCmd)
+
+	void OnRetrieveMessage(void* ecx, void* edx, uint32_t *punMsgType, void *pubDest, uint32_t cubDest, uint32_t *pcubMsgSize)
+	{
+		g_pInventoryChanger->PostRetrieveMessage(punMsgType, pubDest, cubDest, pcubMsgSize);
+	}
+
+	void OnSendMessage(void* ecx, void* edx, uint32_t unMsgType, const void* pubData, uint32_t cubData)
+	{
+
+		void* pubDataMutable = const_cast<void*>(pubData);
+		g_pInventoryChanger->PreSendMessage(unMsgType, pubDataMutable, cubData);
+	}
+
+	//-----------------------------CreateMove------------------------------------------------------------------------------------------
+
+
+	void OnCreateMove(CUserCmd* cmd)
 	{
 		if (g_pPlayers && Interfaces::Engine()->IsInGame())
 		{
 			g_pPlayers->Update();
 
 			if (g_pEsp)
-				g_pEsp->OnCreateMove(pCmd);
+				g_pEsp->OnCreateMove(cmd);
 
 			if (IsLocalAlive())
 			{
@@ -226,16 +396,35 @@ namespace Client
 				}
 
 				if (g_pAimbot)
-					g_pAimbot->OnCreateMove(pCmd, g_pPlayers->GetLocal());
+					g_pAimbot->OnCreateMove(cmd, g_pPlayers->GetLocal());
+
+				if (g_pKnifebot)
+					g_pKnifebot->OnCreateMove(cmd);
 
 				if (g_pMisc)
-					g_pMisc->OnCreateMove(pCmd);
-				
-				
-				backtracking->legitBackTrack(pCmd);
+					g_pMisc->OnCreateMove(cmd);
+
+				G::LocalPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+				G::UserCmd = cmd;
+
+				DWORD* framePointer;
+				__asm mov framePointer, ebp;
+				*(bool*)(*framePointer - 0x1C) = G::SendPacket;
+
+				if (Settings::Ragebot::Enabled)
+					RageBot->Run();
+
+				if (G::SendPacket)
+					G::VisualAngle = G::LocalPlayer->GetEyeAngles();
+
+
+				backtracking->legitBackTrack(cmd);
 			}
 		}
 	}
+
+
+	//-----------------------------------------FireEvent------------------------------------------------------------------------
 
 	void OnFireEventClientSideThink(IGameEvent* pEvent)
 	{
@@ -250,7 +439,8 @@ namespace Client
 				g_pEsp->OnReset();
 		}
 
-		if (Interfaces::Engine()->IsInGame() && Interfaces::Engine()->IsConnected())
+
+		if (Interfaces::Engine()->IsConnected())
 		{
 			hitmarker::singleton()->initialize();
 
@@ -258,12 +448,19 @@ namespace Client
 				g_pEsp->OnEvents(pEvent);
 
 			if (g_pAimbot)
-				g_pAimbot->KillDelay(pEvent);
+				g_pAimbot->OnEvents(pEvent);
 
 			if (g_pSkin)
 				g_pSkin->OnEvents(pEvent);
+
+			if (g_pMisc)
+				g_pMisc->OnEvents(pEvent);
 		}
 	}
+
+
+	//-----------------------------Framestage-------------------------------------------------------------------------
+
 
 	void OnFrameStageNotify(ClientFrameStage_t Stage)
 	{
@@ -274,7 +471,11 @@ namespace Client
 		}
 	}
 
-	void OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &state, const ModelRenderInfo_t &pInfo, matrix3x4_t *pCustomBoneToWorld)
+	//---------------------------------Model----------------------------------------------------------------------------------
+
+
+	void OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &state,
+		const ModelRenderInfo_t &pInfo, matrix3x4_t *pCustomBoneToWorld)
 	{
 		if (Interfaces::Engine()->IsInGame() && ctx && pCustomBoneToWorld)
 		{
@@ -285,6 +486,47 @@ namespace Client
 				g_pMisc->OnDrawModelExecute();
 		}
 	}
+
+
+	//---------------------------------PlaySound-------------------------------------------------------------------
+
+	void OnPlaySound(const Vector* pOrigin, const char* pszSoundName)
+	{
+		if (!pszSoundName || !Interfaces::Engine()->IsInGame())
+			return;
+	}
+
+
+	void OnPlaySound(const char* pszSoundName)
+	{
+		if (g_pMisc)
+			g_pMisc->OnPlaySound(pszSoundName);
+	}
+
+	//--------------------------------View-------------------------------------------------------------------------------
+
+	void OnOverrideView(CViewSetup* pSetup)
+	{
+		if (g_pMisc)
+			g_pMisc->OnOverrideView(pSetup);
+	}
+
+	void OnGetViewModelFOV(float& fov)
+	{
+		if (g_pMisc)
+			g_pMisc->OnGetViewModelFOV(fov);
+	}
+
+	BOOL DirectoryExists(LPCTSTR szPath)
+	{
+		DWORD dwAttrib = GetFileAttributes(szPath);
+
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+			(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+
+
+	//----------------------------------------Rainbowclient----------------------------------------------------------------------------------------
 
 	void ImDrawRectRainbow(int x, int y, int width, int height, float flSpeed, float &flRainbow)
 	{
@@ -306,120 +548,140 @@ namespace Client
 		}
 	}
 
+
+	//-----------------------------------------------------RenderGui---------------------------------------------------------------------------------------------
+
 	void OnRenderGUI()
 	{
-		ImGui::SetNextWindowSize(ImVec2(885.f, 648.f)); // backup 885, 448,
-		ImGui::SetColorEditOptions(ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_PickerHueWheel /*ImGuiColorEditFlags_PickerHueBar*/);
+		static int tabSelected = 0;
+		ImVec2 mainWindowPos;
 
-		if (ImGui::Begin(HACK_NAME, &bIsGuiVisible, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize))
-			if (Settings::Misc::Blackout)
-			{
-				g_pRender->DrawFillBox(0, 0, iScreenWidth, iScreenHeight, Color(0, 0, 0, 170));
-			}
-
+		ImGui::SetNextWindowSize(ImVec2(930, 730)); // format = width height
+		g_pGui->NameFont();
+		if (ImGui::Begin("riptide-remastered", &bIsGuiVisible, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+			g_pRender->DrawFillBox(0, 0, iScreenWidth, iScreenHeight, Color(0, 0, 0, 170));
 		{
+			
+			mainWindowPos = ImGui::GetWindowPos();
 
-			if (Settings::Misc::SkeetBar)
-			{
-				static float flRainbow;
-				float flSpeed = 0.001;
-				int curWidth = 4;
-				ImVec2 curPos = ImGui::GetCursorPos();
-				ImVec2 curWindowPos = ImGui::GetWindowPos();
-				curPos.x += curWindowPos.x;
-				curPos.y += curWindowPos.y;
-				int size;
-				int y;
-				Interfaces::Engine()->GetScreenSize(y, size);
-				ImDrawRectRainbow(curPos.x - 10, curPos.y - 8, ImGui::GetWindowSize().x + size, curPos.y + -4, flSpeed, flRainbow);//10 5 4
-			}
+			//---------------------Raimbow-----------------------------------------------------------------------------------
+
+			static float flRainbow;
+			static float flSpeed = 0.003;
+			int curWidth = 3;
+			ImVec2 curPos = ImGui::GetCursorPos();
+			ImVec2 curWindowPos = ImGui::GetWindowPos();
+			curPos.x += curWindowPos.x;
+			curPos.y += curWindowPos.y;
+			int size = 2;
+			int y;
+			Interfaces::Engine()->GetScreenSize(y, size);
+			ImDrawRectRainbow(curPos.x - 10, curPos.y - 1, ImGui::GetWindowSize().x + size, curPos.y + -4, flSpeed, flRainbow);
+
+			//---------------------------Groups--------------------------------------------------------------------------------------------------
+
+			ImGui::BeginGroup();
 
 			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType > 1)
 				Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType = 1;
 
-			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit > 4)
-				Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit = 4;
+			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit > 1)
+				Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit = 1;
 
-			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot > 13)
-				Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot = 13;
+			if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot > 5)
+				Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot = 5;
 
-			g_pGui->IconsFont();
-			const char* tabNames[] =
-			{ AIMBOT_TEXT , VISUAL_TEXT , SKIN_TEXT , MISC_TEXT };
+			enum DWRITE_READING_DIRECTION {
+				DWRITE_READING_DIRECTION_LEFT_TO_RIGHT,
+				DWRITE_READING_DIRECTION_RIGHT_TO_LEFT
+			};
 
+			g_pGui->bluefont();
+			ImGui::TextColored(ImVec4{ 0.0f, 0.5f, 0.0f, 1.0f }, "FPS:%03d", get_fps());
+			ImGui::Separator();
+			g_pGui->IconFont();
+			const char* tabNames[] = {
+				"A" , "A" ,"I" , "B" , "G" };
 
-			static int tabOrder[] = { 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 };
-			static int tabSelected = 0;
+			static int tabOrder[] = { 0 , 1 , 2 , 3 , 4 };
+			static int tabSelected = 5;
 			const bool tabChanged = ImGui::TabLabels(tabNames,
 				sizeof(tabNames) / sizeof(tabNames[0]),
 				tabSelected, tabOrder);
 
 			ImGui::Spacing();
-			ImGui::Separator();
+			ImGui::Spacing();
+			ImGui::Spacing();
 			ImGui::Spacing();
 
-			float SpaceLineOne = 120.f;
-			float SpaceLineTwo = 233.f;
-			float SpaceLineThr = 250.f;
-			float SpaceLineFor = 150.f;
-			float SpaceLineFiv = 120.f;
-			float SpaceLineFev = 240.f;
-			float SpaceLineEsp = 200.f;
+			static int iConfigSelect = 0;
+			static int iMenuSheme = 1;
+			static char ConfigName[64] = { 0 };
 
-			const char* gloves_listbox_items[49] =
+			//-------------------------------------------Configs-------------------------------------------------------------------------
+
+			g_pGui->bluefont();
+			ImGui::PushItemWidth(100.f);
+			ImGui::ComboBoxArray("##1", &iConfigSelect, ConfigList);
+			ImGui::Spacing();
+			ImGui::PushItemWidth(100.f);
+			ImGui::InputText("##0", ConfigName, 64);
+			if (ImGui::Button("Create", ImVec2(100.f, 25.f)))
 			{
-				"default",
-				"Sport Gloves | Superconductor",
-				"Sport Gloves | Pandora's Box",
-				"Sport Gloves | Hedge Maze",
-				"Sport Gloves | Arid",
-				"Sport Gloves | Vice",
-				"Sport Gloves | Omega",
-				"Sport Gloves | Bronze Morph",
-				"Sport Gloves | Amphibious",
-				"Moto Gloves | Eclipse",
-				"Moto Gloves | Spearmint",
-				"Moto Gloves | Boom!",
-				"Moto Gloves | Cool Mint",
-				"Moto Gloves | Polygon",
-				"Moto Gloves | Transport",
-				"Moto Gloves | Turtle",
-				"Moto Gloves | Pow",
-				"Specialist Gloves | Crimson Kimono",
-				"Specialist Gloves | Emerald Web",
-				"Specialist Gloves | Foundation",
-				"Specialist Gloves | Forest DDPAT",
-				"Specialist Gloves | Mogul",
-				"Specialist Gloves | Fade",
-				"Specialist Gloves | Buckshot",
-				"Specialist Gloves | Crimson Web",
-				"Driver Gloves | Lunar Weave",
-				"Driver Gloves | Convoy",
-				"Driver Gloves | Crimson Weave",
-				"Driver Gloves | Diamondback",
-				"Driver Gloves | Racing Green",
-				"Driver Gloves | Overtake",
-				"Driver Gloves | Imperial Plad",
-				"Driver Gloves | King Snake",
-				"Hand Wraps | Leather",
-				"Hand Wraps | Spruce DDPAT",
-				"Hand Wraps | Badlands",
-				"Hand Wraps | Slaughter",
-				"Hand Wraps | Aboreal",
-				"Hand Wraps | Duct Tape",
-				"Hand Wraps | Overprint",
-				"Hand Wraps | Cobalt Skulls",
-				"Bloodhound Gloves | Charred",
-				"Bloodhound Gloves | Snakebite",
-				"Bloodhound Gloves | Bronzed",
-				"Bloodhound Gloves | Guerrilla",
-				"Hydra Gloves | Case Hardened",
-				"Hydra Gloves | Rattler",
-				"Hydra Gloves | Mangrove",
-				"Hydra Gloves | Emerald",
-			};
+				string ConfigFileName = ConfigName;
 
-			const char* weapons[34] =
+				if (ConfigFileName.size() < 1)
+				{
+					ConfigFileName = "settings";
+				}
+
+				Settings::SaveSettings(BaseDir + "\\" + ConfigFileName + ".Riptide");
+				RefreshConfigs();
+			}
+			ImGui::Spacing();
+			if (ImGui::Button("Load", ImVec2(47.5f, 25.f)))
+			{
+				Settings::LoadSettings(BaseDir + "\\" + ConfigList[iConfigSelect]);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Save", ImVec2(47.5f, 25.f)))
+			{
+				Settings::SaveSettings(BaseDir + "\\" + ConfigList[iConfigSelect]);
+
+			}
+			ImGui::Spacing();
+			if (ImGui::Button("Refresh", ImVec2(100.f, 25.f)))
+			{
+				RefreshConfigs();
+			}
+
+
+
+
+			//-------------------------------------------SpaceLines-----------------------------------------------------------------------------
+
+			ImGui::Separator();
+
+			ImGui::Columns();
+
+			float SpaceLineTitleOne = 120.f;
+			float SpaceLineTitleTwo = 230.f;
+			float SpaceLineTitleThr = 460.f;
+			float SpaceLineTitleFour = 460.f;
+
+
+			float SpaceLineBoxOne = 135.f;
+			float SpaceLineBoxTwo = 275.f;
+			float SpaceLineBoxThr = 410.f;
+			float SpaceLineBoxFour = 475.f;
+
+
+			float SpaceLineOne = 120.f;
+			float SpaceLineTwo = 240.f;
+			float SpaceLineThr = 360.f;
+			float SpaceLineFour = 440.f;
+
+			const char* weapons[33] =
 			{
 				"deagle",
 				"elite",
@@ -440,7 +702,6 @@ namespace Client
 				"m4a1_s",
 				"mac10",
 				"p90",
-				"mp5-sd",
 				"ump45",
 				"xm1014",
 				"bizon",
@@ -457,1369 +718,1731 @@ namespace Client
 				"ssg08"
 			};
 
-			const char* iHitSound[] =
-			{
-				"Off",
-				"Default",
-				"Anime",
-				"Roblox",
-				"GameSense",
-				"German",
-				"HeadMeme",
-				"FadeCSGO.tk"
-			};
+			ImGui::EndGroup();
+			ImGui::SameLine();
 
-			const char* skybox_items[] =
+			//---------------------------------------------------------------------------------Ragebot--------------------------------------------------------------------------------------------
+			if (tabSelected == 0) // Rage
 			{
-				"cs_baggage_skybox_",
-				"cs_tibet",
-				"embassy",
-				"italy",
-				"jungle",
-				"nukeblank",
-				"office",
-				"sky_cs15_daylight01_hdr",
-				"sky_cs15_daylight02_hdr",
-				"sky_cs15_daylight03_hdr",
-				"sky_cs15_daylight04_hdr",
-				"sky_csgo_cloudy01",
-				"sky_csgo_night02",
-				"sky_csgo_night02b",
-				"sky_csgo_night_flat",
-				"sky_day02_05_hdr",
-				"sky_day02_05",
-				"sky_dust",
-				"sky_l4d_rural02_ldr",
-				"sky_venice",
-				"vertigo_hdr",
-				"vertigoblue_hdr",
-				"vertigo",
-				"vietnam",
-				"greenscreen", //start of custom
-				"amethyst",
-				"extreme_glaciation_",
-				"persistent_fog_",
-				"polluted_atm_",
-				"toxic_atm_",
-				"water_sunset_",
-				"blue1",
-				"blue2",
-				"blue3",
-				"blue4",
-				"blue5",
-				"blue6",
-				"dark1",
-				"dark2",
-				"dark3",
-				"dark4",
-				"dark5",
-				"green1",
-				"green2",
-				"green3",
-				"green4",
-				"green5",
-				"night1",
-				"night2",
-				"night3",
-				"night4",
-				"night5",
-				"orange1",
-				"orange2",
-				"orange3",
-				"orange4",
-				"orange5",
-				"orange6",
-				"pink1",
-				"pink2",
-				"pink3",
-				"pink4",
-				"pink5",
-			};
 
-			g_pGui->MainFont();
+				static int otherpages = 1;
+				static int ragebutton = 1;
 
-			if (tabSelected == 0) // Legit
-			{
-				ImGui::BeginChild("##General", ImVec2(300, -1), true);
+				g_pGui->bluefont();
+				ImGui::BeginGroup();
+				ImGui::BeginChild(1, ImVec2(-1, 680), true);
 				{
-					ImGui::Text("General");
-					ImGui::Checkbox("Autowall", &Settings::Aimbot::aim_WallAttack);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("AntiJump", &Settings::Aimbot::aim_AntiJump);
-					ImGui::Checkbox("CheckSmoke", &Settings::Aimbot::aim_CheckSmoke);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("CheckFlash", &Settings::Aimbot::aim_CheckFlash);
-					ImGui::Checkbox("Draw Spot", &Settings::Aimbot::aim_DrawSpot);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("FriendlyFire", &Settings::Aimbot::aim_Deathmatch);
-					ImGui::Checkbox("Draw Fov", &Settings::Aimbot::aim_DrawFov);
+
+
+					ImGui::Text("RAGEBOT");
+
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+					ImGui::Text("Oneclick Rage - Enable preset rage settings");
+
+					ImGui::Spacing();
+
+					if (ImGui::Button("RAGE - PRESET"))
+						Settings::Ragebot::Enabled = true,
+						Settings::Ragebot::Silent = true,
+						Settings::Ragebot::MultiPoints = true,
+						Settings::Ragebot::AutoFire = true,
+						Settings::Ragebot::RCS = true,
+						Settings::Aimbot::aim_Backtrack = true,
+						Settings::Aimbot::aim_DrawBacktrack = true,
+						Settings::Aimbot::aim_Backtracktickrate = 12,
+						Settings::Ragebot::FOV = 360,
+						Settings::Ragebot::Resolver = false,
+						Settings::Misc::ShowSpread = true,
+						Settings::Ragebot::PointScale = 0.4,
+						Settings::Ragebot::HitScanAll = true,
+						Settings::Ragebot::bones[HITBOX_HEAD] = true,
+						Settings::Ragebot::bones[HITBOX_ARMS2] = true,
+						Settings::Ragebot::bones[HITBOX_NECK] = true,
+						Settings::Ragebot::bones[HITBOX_LEGS2] = true,
+						Settings::Ragebot::bones[HITBOX_SPINE2] = true,
+						Settings::Ragebot::bones[HITBOX_PELVIS2] = true,
+						Settings::Ragebot::aw = true,
+						Settings::Ragebot::HitChance = false,
+						Settings::Ragebot::AutoWallDmg = 8,
+						Settings::Ragebot::BaimAfterShoots = 3,
+						Settings::Ragebot::BaimAfterHP = 18;
+						ImGui::Spacing();
+
+
+
+
+					ImGui::Separator();
+					if (ImGui::Button("Rage", ImVec2(395.5f, 30.0f)))
+					{
+						otherpages = 1;
+					}
 					ImGui::SameLine();
-					ImGui::ColorEdit3("Color", Settings::Aimbot::aim_FovColor);
+					if (ImGui::Button("AntiAim", ImVec2(395.5f, 30.0f)))
+					{
+						otherpages = 2;
+					}
+					if (otherpages == 1)
+					{
+						ImGui::Separator();
+						ImGui::Text("!ENABLE MULTI POINT OR IT WONT WORK!");
+						ImGui::Checkbox("Active", &Settings::Ragebot::Enabled);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Master Switch for Ragebot");
+						ImGui::SameLine();
+						ImGui::Checkbox("Aimstep", &Settings::Ragebot::Aimstep);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Prevents you from being kicked for VAC Error");
+						ImGui::SameLine();
+						ImGui::Checkbox("Silent", &Settings::Ragebot::Silent);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shoot at Targets without Aiming at them");
+						ImGui::SameLine();
+						ImGui::Checkbox("Multi Point", &Settings::Ragebot::MultiPoints);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Scans for Valid Hitpoints on Enemies");
 
-					ImGui::Spacing();
-					ImGui::Spacing();
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
 
-					ImGui::Text("Backtrack");
-					ImGui::Separator();
-					ImGui::Checkbox("Backtrack", &Settings::Aimbot::aim_Backtrack);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Visualise ticks", &Settings::Aimbot::aim_DrawBacktrack);
-					ImGui::SliderInt("Tickrate", &Settings::Aimbot::aim_Backtracktickrate, 1, 12);
+						ImGui::Checkbox("Friendly Fire", &Settings::Ragebot::FriendlyFire);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shoots at Teammates");
+						ImGui::SameLine(SpaceLineOne);
+						ImGui::Checkbox("Auto Fire", &Settings::Ragebot::AutoFire);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shoots automatically as soon as Target is hitable");
 
-					ImGui::Spacing();
-					ImGui::Spacing();
+						ImGui::Checkbox("Auto Stop", &Settings::Ragebot::AutoStop);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Stops moving when shooting");
+						ImGui::SameLine(SpaceLineOne);
 
-					ImGui::Text("Kill Delay");
-					ImGui::Separator();
-					ImGui::Checkbox("Kill Delay", &Settings::Aimbot::aim_KillDelay);
-					ImGui::SliderInt("Kill Delay Time", &Settings::Aimbot::aim_KillDelayTime, 0, 100);
+						/*ImGui::Checkbox("Auto Scope", &Settings::Ragebot::AutoScope);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("BUGGY - Auto Scopes when able to shoot at Target");	//Disabled (Bad Autoscope)
+							*/
 
-				}ImGui::EndChild();	ImGui::SameLine();
+						ImGui::Checkbox("Auto Crouch", &Settings::Ragebot::AutoCrouch);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Crouchs if shooting");
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("No Recoil", &Settings::Ragebot::RCS);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Removes Recoil - RCS");
 
-				ImGui::BeginChild("##Aimbot", ImVec2(-1, -1), true);
+						ImGui::Checkbox("Draw Spread", &Settings::Misc::ShowSpread);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Draws Spread as Circle - Looks like shit");
+
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Checkbox("Backtrack", &Settings::Aimbot::aim_Backtrack);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("You can teleport enemies to an older position and kill them");
+						ImGui::SameLine(SpaceLineOne);
+						ImGui::Checkbox("Visualise Ticks", &Settings::Aimbot::aim_DrawBacktrack);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Renders Ticks with potential to be Backtracked");
+						ImGui::SliderInt("Tickrate", &Settings::Aimbot::aim_Backtracktickrate, 1, 12);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Set Backtrack Tick Tate (higher number longer backtrack)");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+						ImGui::SliderFloat("Aimbot Fov", &Settings::Ragebot::FOV, 1, 360);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("FOV for Aimbot - If 360 shoots in all Directions");
+						ImGui::Spacing();
+						ImGui::SliderFloat("StepValue", &Settings::Ragebot::AimstepAmount, 1, 180);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Speed of Target switch");
+						ImGui::SliderFloat("Point Scale", &Settings::Ragebot::PointScale, 0.f, 1.f);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Size of Hitpoints");
+						ImGui::Combo("Hitbox", &Settings::Ragebot::Hitbox, ("Pelvis\0\rLower Spine\0\Head\0\rMiddle Spine\0\rUpper Spine\0\rHip\0\rNeck\0\0"));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shoots ONLY at selected Hitpoint");
+
+
+
+
+
+
+
+						ImGui::Combo("Hit Scan", &Settings::Ragebot::HitScan, ("Off\0\rCustom\0\0"));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("!ENABLE AUTOWALL + MULTI POINT OR IT WON'T WORK! - Shoots at selected Hitpoints - Multiple Hitpoints possible");
+
+						static bool hitinformations = false;
+
+						if (Settings::Ragebot::HitScan)
+						{
+							hitinformations = true;
+							ImGui::Checkbox("Head", &Settings::Ragebot::bones[HITBOX_HEAD]);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Shoots at Head");
+							ImGui::SameLine(SpaceLineOne);
+							ImGui::Checkbox("Arms", &Settings::Ragebot::bones[HITBOX_ARMS2]);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Shoots at Arms");
+
+							ImGui::Checkbox("Neck", &Settings::Ragebot::bones[HITBOX_NECK]);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Shoots at Neck");
+							ImGui::SameLine(SpaceLineOne);
+							ImGui::Checkbox("Legs", &Settings::Ragebot::bones[HITBOX_LEGS2]);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Shoots at Legs");
+
+							ImGui::Checkbox("Spine", &Settings::Ragebot::bones[HITBOX_SPINE2]);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Shoots at Spine - Knees");
+							ImGui::SameLine(SpaceLineOne);
+							ImGui::Checkbox("Pelvis", &Settings::Ragebot::bones[HITBOX_PELVIS2]);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Shoots at Pelvis");
+							ImGui::Text("!ENABLE MULTI POINT AND ENABLE AUTOWALL OR HIT SCAN WON'T WORK!");
+						}
+
+						if (hitinformations)
+						{
+							//load ur cfg
+							bool done = false;
+							Anime::Popup("Enable Multi Point and Autowall for HitScan!", 4000, &done);
+							if (done)
+								hitinformations = false;
+						}
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+
+
+
+
+
+
+						ImGui::Checkbox("AutoWall", &Settings::Ragebot::aw);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Enable if Hitscan = Custom ----/---- Disable if Hitscan = Off");
+						ImGui::SameLine(SpaceLineBoxOne);
+						/*ImGui::Checkbox("Hit Chance##1", &Settings::Ragebot::HitChance);
+						if (ImGui::IsItemHovered())																		//Doesnt work anymore
+							ImGui::SetTooltip("Enables Hitchance - Shoots only if the Chance is x to hit the Target");*/
+						ImGui::SameLine(SpaceLineBoxTwo);
+						ImGui::Checkbox("Resolver", &Settings::Ragebot::Resolver);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Enable this if Enemy has AntiAim (Spins) - THIS RESOLVER IS SHIT BTW");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Checkbox("Override Resolver", &Settings::Ragebot::ResolverOverride);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Overrides Resolver");
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Hotkey("Override Key", &Settings::Ragebot::OverrideKey, ImVec2(100, 25));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Press this Key to disable Resolver while pressed");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+						ImGui::SliderFloat("Min Damage", &Settings::Ragebot::AutoWallDmg, 1, 100);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Only shoots if you are able to do x Damage to Target");
+					/*	ImGui::SliderFloat("Hit Chance##2", &Settings::Ragebot::HitChanceAmt, 1, 100);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Only shoots if Chance is x to hit the enemy - !High % = maybe won't shoot!");*/  //Buggy Disabled
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+
+						ImGui::SliderInt("BaimAfterShoots", &Settings::Ragebot::BaimAfterShoots, 1, 100);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shoots at Targets Body after x shots - Use this if you don't hit the Target bcs RESOLVER IS SHIT");
+						ImGui::SliderInt("BaimAfterHP", &Settings::Ragebot::BaimAfterHP, 1, 100);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shoots at Targets Body if Enemy has x HP Left");
+
+
+
+
+					}
+					if (otherpages == 2)
+					{
+						ImGui::Separator();
+						ImGui::Checkbox("Enable Antiaim", &Settings::Ragebot::AAEnabled);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Crashes on some Servers - Changes Real Players Aim Position (Spin)");
+						ImGui::SameLine(SpaceLineBoxTwo);
+						ImGui::Checkbox("UntrustedCheck", &Settings::Ragebot::UntrustedCheck);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Use this to prevent Untrusted Bans - USE THIS IN MATCHMAKING! - DON'T USE THIS ON HVH SERVERS!");
+						ImGui::SameLine(SpaceLineBoxFour);
+						ImGui::Checkbox("AAIndicator", &Settings::Esp::esp_AAIndicator);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shows Anti Aim Indicator");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+						const char* aaYawList[] = { "None", "Slow Spin", "Backward", "Left", "Right", "Foward", "Fast Spin","Jitter","Backwards Jitter", "Antifake Spin" };
+						const char* aaFakeYawList[] = { "None", "Slow Spin", "Backward", "Left", "Right", "Foward", "Fast Spin", "Jitter","Backwards Jitter", "Antifake Spin" };
+						const char* aaPitchList[] = { "None", "Down", "Up" };
+						ImGui::Combo("Pitch##AA", &Settings::Ragebot::Pitch, aaPitchList, IM_ARRAYSIZE(aaPitchList));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Forces Player Model to look DOWN or UP");
+						ImGui::Combo("RealYaw##AA", &Settings::Ragebot::RealYaw, aaYawList, IM_ARRAYSIZE(aaYawList));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Changes Real Player Model - Won't be Visible if Enemy doesn't have a Resolver - (Use BACKWARD if you don't know what to use) ");
+
+						ImGui::Combo("FakeYaw##AA", &Settings::Ragebot::FakeYaw, aaFakeYawList, IM_ARRAYSIZE(aaFakeYawList));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Changes Fake Player Model - Everyone will see this - (Use FAST SPIN if you don't know what to use) ");
+
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						if (ImGui::Button("Fakelag", ImVec2(395.5f, 20.0f)))
+						{
+							ragebutton = 1;
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("Walks", ImVec2(395.5f, 20.0f)))
+						{
+							ragebutton = 2;
+						}
+
+						if (ragebutton == 1)
+						{
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							const char* FakeLags[] = { "None", "Normal", "Factor", "Switch", "Adaptive" };
+							ImGui::Combo("Fakelag Type", &Settings::Ragebot::FakeLags, FakeLags, IM_ARRAYSIZE(FakeLags));
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Makes you Lag Ingame - Also works as Anti riggerbot");
+							ImGui::SliderInt("##Fakelag_amt", &Settings::Ragebot::Fakelag_amt, 1, 16);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Sets Amount of Fakelag Strenght - 1 = Almost no Lag - 16 = Hard Lag");
+
+						}
+
+						if (ragebutton == 2)
+						{
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							ImGui::Checkbox("Glitch Walk", &Settings::Ragebot::glitch_bool);
+							ImGui::Hotkey("Fake Walk Key", &Settings::Ragebot::fakewalk, ImVec2(150, 20));
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Enables Fakewalk - Use this if you Peak around Corners");
+							ImGui::SliderInt("Fake Walk Speed", &Settings::Ragebot::walkspeed, 1, 12);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Set Speed of your Wakewalk");
+						}
+
+					}
+
+					ImGui::EndChild();
+					ImGui::EndGroup();
+				}
+				//------------------------------------------------------------------------Aimbot-----------------------------------------------------------------------------------------------------
+
+			}
+			else if (tabSelected == 1) // Aimbot
+			{
+				g_pGui->bluefont();
+
+
+				static int otherpages = 1;
+				const char* ClampType[] = { "All Target" , "Shot" , "Shot + Target" };
+				const char* Aimspot[] = { "Head" , "Neck" ,  "Body" , "Thorax" , "Chest" };
+				const char* AimFovType[] = { "Dynamic" , "Static" };
+				const char* BestHit[] = { "Disable" , "Enable" };
+
+				ImGui::BeginGroup();
+				ImGui::BeginChild(1, ImVec2(-1, 680), true);
 				{
-					ImGui::Text("Aimbot");
-					ImGui::Checkbox("Activate aimbot", &Settings::Aimbot::aim_Active);
+
+					ImGui::BeginGroup();
+
+					ImGui::Text("LEGITBOT");
+					ImGui::Separator();
+
+					ImGui::Combo("Weapon", &iWeaponID, pWeaponData, IM_ARRAYSIZE(pWeaponData));
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Select the Weapon you wan't to change the config for");
+
+
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+					ImGui::Checkbox("Active", &Settings::Aimbot::aim_Active);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Master Switch");
 					ImGui::SameLine();
 					ImGui::Checkbox("On Key", &Settings::Aimbot::aim_OnKey);
-
-					if (Settings::Aimbot::aim_OnKey)
-					{
-						ImGui::SameLine();
-						ImGui::Hotkey("Key", &Settings::Aimbot::aim_Key, ImVec2(100, 25));
-					}
-					ImGui::PushItemWidth(130.f);
-					ImGui::Combo("Weapon", &iWeaponID, weapons, IM_ARRAYSIZE(weapons));
-					ImGui::PopItemWidth();
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Enables Aimbot on Key");
 					ImGui::SameLine();
-					ImGui::Checkbox("Active", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Active);
+					if (Settings::Aimbot::aim_OnKey)
+						ImGui::Hotkey("Key", &Settings::Aimbot::aim_Key, ImVec2(100, 25));
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Press Key for Aimbot Toggle");
+
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+
+
+					ImGui::Checkbox("Attack Team", &Settings::Aimbot::aim_Deathmatch);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Useful in free for all community servers");
+					ImGui::SameLine(SpaceLineOne);
+					ImGui::Checkbox("Trough Walls", &Settings::Aimbot::aim_WallAttack);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("activates aimbot if player takes damage through penetrable walls");
+					ImGui::SameLine(SpaceLineTwo);
+					ImGui::Checkbox("Smoke Check", &Settings::Aimbot::aim_CheckSmoke);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("does not activate aimbot if smoke is between you and the enemy");
+
+					ImGui::Checkbox("Jump Check", &Settings::Aimbot::aim_AntiJump);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Disables aimbot if enemy and/or you are jumping");
+					ImGui::SameLine(SpaceLineOne);
+					ImGui::Checkbox("Flash Check", &Settings::Aimbot::aim_CheckFlash);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Disables aimbot if you are Flashed");
+					ImGui::SameLine(SpaceLineTwo);
+					ImGui::Checkbox("Fast Zoom", &Settings::Aimbot::aim_FastZoom);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Fastzoom for AWP/Sout/Auto");
+
+
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+
+					ImGui::Checkbox("Draw Fov", &Settings::Aimbot::aim_DrawFov);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Renders radius of influence of aimbot");
+					ImGui::SameLine(SpaceLineOne);
+					ImGui::Checkbox("Draw Aim-Spot", &Settings::Aimbot::aim_DrawSpot);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Renders point of aimbot attack");
+					ImGui::SameLine(SpaceLineTwo);
+					ImGui::Checkbox("Auto Crouch", &Settings::Aimbot::aim_Crouch);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Auto Crouchs if you shoot for higher Accuracy");
+
+
+
+
+					ImGui::Checkbox("Draw Recoil", &Settings::Misc::misc_Punch2);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Draws Recoil");
+					ImGui::SameLine(SpaceLineOne);
+					ImGui::Checkbox("Draw Spread", &Settings::Misc::ShowSpread);			//Disabled (Update Framestage)
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Draws Spread as Circle");
+
 					if (iWeaponID <= 9)
 					{
-						ImGui::SameLine();
-						ImGui::Checkbox("Autopistol", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_AutoPistol);
-					}
-					ImGui::PushItemWidth(280.f);
-					ImGui::SliderInt("Fov", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov, 0, 300);
-					ImGui::SliderInt("Smooth", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth, 0, 300);
-					ImGui::PopItemWidth();
-					ImGui::PushItemWidth(280.f);
-					const char* BestHit[] = { "Prefer Manually" , "Nearest" , "Ignore Head" , "Ignore Arms/Legs" , "Ignore Arms/Legs/Neck" };
-					ImGui::Combo("Best Hit", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit, BestHit, IM_ARRAYSIZE(BestHit));
-					const char* AimFovType[] = { "Dynamic" , "Static" };
-					ImGui::Combo("Fov Type", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType, AimFovType, IM_ARRAYSIZE(AimFovType));
-					ImGui::PopItemWidth();
-
-
-					const char* Aimspot[] = { "Head" , "Neck" ,  "Body" , "Thorax" , "Chest" , "Right Thigh" , "Left Thigh" , "Right Hand" , "Left Hand" , "Right Upperarm" , "Right Forearm" , "Left Upperarm" , "Left Forearm" };
-					ImGui::PushItemWidth(280.f);
-					ImGui::Combo("Aimspot", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot, Aimspot, IM_ARRAYSIZE(Aimspot));
-					ImGui::PopItemWidth();
-
-					ImGui::PushItemWidth(280.f);
-					ImGui::SliderInt("Shot Delay", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Delay, 0, 200);
-					ImGui::PopItemWidth();
-
-					ImGui::Spacing();
-					ImGui::Spacing();
-
-					ImGui::Text("Recoil System Control");
-					const char* ClampType[] = { "All Target" , "Shot" , "Shot + Target" };
-					const char* RCSType[] = { "Default", "RCS Horizontal & Vertical" };
-					ImGui::Separator();
-					ImGui::PushItemWidth(280.f);
-					if (iWeaponID >= 10 && iWeaponID <= 31)
-					{
-						ImGui::Combo("RCS Clamp", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsClampType, ClampType, IM_ARRAYSIZE(ClampType));
-					}
-					ImGui::Combo("RCS Type", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType, RCSType, IM_ARRAYSIZE(RCSType));
-					if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType <= 0)
-					{
-						ImGui::SliderInt("RCS", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcs, 0, 100);
-					}
-					if (Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RCSType >= 1)
-					{
-						ImGui::SliderInt("RCS X", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx, 0, 100);
-						ImGui::SliderInt("RCS Y", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy, 0, 100);
-					}
-					if (iWeaponID >= 10 && iWeaponID <= 31)
-					{
-						ImGui::SliderInt("RCS Fov", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov, 0, 300);
-						ImGui::SliderInt("RCS Smooth", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth, 0, 300);
-					}
-					ImGui::PopItemWidth();
-
-				}ImGui::EndChild();	ImGui::SameLine();
-			}
-
-			else if (tabSelected == 1) // Visuals
-			{
-				ImGui::BeginChild("##EspPlayers", ImVec2(431, -1), true);
-				{
-					ImGui::Text("General");
-					ImGui::Separator();
-					ImGui::Checkbox("Team", &Settings::Esp::esp_Team);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Enemy", &Settings::Esp::esp_Enemy);
-					ImGui::SameLine(SpaceLineFev);
-					ImGui::Checkbox("Esp Line", &Settings::Esp::esp_Line);
-					ImGui::Checkbox("Watermark", &Settings::Esp::esp_Watermark);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Last Build", &Settings::Esp::esp_Cheatbuild);
-					ImGui::SameLine(SpaceLineFev);
-					ImGui::Checkbox("Bomb Player", &Settings::Esp::esp_Bomb);
-					ImGui::Checkbox("Esp Info", &Settings::Esp::esp_Infoz);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Bomb Planted", &Settings::Esp::esp_BombPlanted);
-					ImGui::SameLine(SpaceLineFev);
-					ImGui::PushItemWidth(80.f);
-					ImGui::SliderInt("Timer", &Settings::Esp::esp_BombTimer, 40, 65);
-					ImGui::PopItemWidth();
-					if (Settings::Esp::esp_Infoz)
-					{
-						ImGui::Checkbox("Esp Defusing", &Settings::Esp::esp_Defusing);
-						ImGui::SameLine(SpaceLineFiv);
-						ImGui::Checkbox("Esp Scoped", &Settings::Esp::esp_Scoped);
-						ImGui::SameLine(SpaceLineFev);
-						ImGui::Checkbox("Esp Flashed", &Settings::Esp::esp_Flashed);
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("Auto Pistol", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_AutoPistol);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("ability to use pistols like an automatic gun, hold down left mouse button");
 					}
 
 					ImGui::Spacing();
-
-					ImGui::Text("Players");
 					ImGui::Separator();
-					ImGui::Checkbox("Name", &Settings::Esp::esp_Name);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Skeleton", &Settings::Esp::esp_Skeleton);
-					ImGui::SameLine(SpaceLineFev);
-					ImGui::Checkbox("Animals", &Settings::Esp::esp_Animals);
-					ImGui::Checkbox("Ammo", &Settings::Esp::esp_Ammo);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Distance", &Settings::Esp::esp_Distance);
-					ImGui::SameLine(SpaceLineFev);
-					ImGui::Checkbox("Rank", &Settings::Esp::esp_Rank);
-					ImGui::PushItemWidth(80.f);
-					ImGui::Checkbox("Weapon", &Settings::Esp::esp_Weapon);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Combo("Esp Weapon##", &Settings::Esp::esp_WeaponIcon, "Name\0\rIcon\0\0", -1);
-					ImGui::PopItemWidth();
-					ImGui::PushItemWidth(280.f);
-					ImGui::SliderInt("Esp Size", &Settings::Esp::esp_Size, 1, 10);
-					ImGui::SliderInt("Aim Direction", &Settings::Esp::esp_BulletTrace, 0, 500);  //3000
-					ImGui::PopItemWidth();
-
 					ImGui::Spacing();
 
-					ImGui::Text("Granade Helper");
+					ImGui::Checkbox("Backtrack", &Settings::Aimbot::aim_Backtrack);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("You can teleport enemies to an older position and kill them");
+					ImGui::SameLine(SpaceLineOne);
+					ImGui::Checkbox("Visualise Ticks", &Settings::Aimbot::aim_DrawBacktrack);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Renders Ticks with potential to be Backtracked");
+					ImGui::SliderInt("Tickrate", &Settings::Aimbot::aim_Backtracktickrate, 1, 12);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Set Backtrack Tick Tate (higher number longer backtrack)");
+
+					ImGui::Spacing();
+					ImGui::Spacing();
 					ImGui::Separator();
-					ImGui::Checkbox("Enable", &Settings::Esp::helper);
+					ImGui::Spacing();
+					ImGui::Spacing();
+
+					if (ImGui::Button("Aimbot", ImVec2(395.5f, 20.0f))) // <---- customize these to your liking.
+					{
+						otherpages = 1;
+					}
 					ImGui::SameLine();
-					ImGui::ColorEdit3("Color", Settings::Esp::GrenadeHelper);
-					if (ImGui::Button("Update Map"))
+					if (ImGui::Button("Recoil", ImVec2(395.5f, 20.0f))) // <---- again, customize to your liking.
 					{
-						cGrenade.bUpdateGrenadeInfo(Interfaces::Engine()->GetLevelNameShort());
+						otherpages = 2;
 					}
 
-					ImGui::Spacing();
-
-					ImGui::Text("Radar settings");
-
-					ImGui::Checkbox("Active", &Settings::Radar::rad_Active);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("InGame", &Settings::Radar::rad_InGame);
-					if (Settings::Radar::rad_InGame)
+					if (otherpages == 1)
 					{
+						ImGui::Spacing();
+						ImGui::Separator();
+
+						ImGui::Spacing();
+
+						if (ImGui::Checkbox("pSilent", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_pSilent))
+						
+						{
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 1;
+						}
+
+
 						ImGui::SameLine();
-						ImGui::Hotkey("InGame Key", &Settings::Radar::rad_InGameKey, ImVec2(50, 20));
+						ImGui::SliderInt("pSilent Fov", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_pSilentFov, 1, 180);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Sets FOV for Silent Aimbot - Silent Aimbot Shoots at Targets without Aiming at them - OBVIOUS IN OVERWATCH!");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+						ImGui::Text("Aimbot Settings");
+						ImGui::SliderInt("Aimbot Fov", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov, 1, 180);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("area that aimbot effects");
+						ImGui::Spacing();
+						ImGui::Text("SMOOTHING: USE SMOOTH > 50 & RCS SMOOTH > 50 IN THE RECOIL TAB! OTHERWISE THE SMOOTHING WON'T WORK.");
+						ImGui::SliderInt("Smoothing", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth, 1, 300);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("humanizes aimbot's travel to enemy - lower fov = snapping - higher fov = looks real");
+						ImGui::SliderInt("Ultrasmooth", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth, 1, 3000);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("You can change the smoothing up to 3000 - Extreme Smooth Aimbot");
+						ImGui::Spacing();
+
+						ImGui::Combo("Fov Type", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_FovType, AimFovType, IM_ARRAYSIZE(AimFovType));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("dynamic changes size of FOV depending on distance between you and enemy");
+
+						ImGui::Combo("Best Hit", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_BestHit, BestHit, IM_ARRAYSIZE(BestHit));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Looks more legit, rather than forcing hitting aimspot every time");
+
+						ImGui::Combo("Aimspot", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Spot, Aimspot, IM_ARRAYSIZE(Aimspot));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("if besthit is disabled, this forces one location for the aimbot to travel to");
+
+
+						if (ImGui::SliderFloat("KillDelay", &Settings::Aimbot::aim_KillDelayTime, 0.f, 2.f))
+						{
+							Settings::Aimbot::aim_KillDelay = 1;
+						}
+						ImGui::SliderInt("ShotDelay", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Delay, 1, 200);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("amount of time before automated rcs kicks in");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Text("Custom Settings - Auto Adjust your Smoothness");
+
+
+
+						if (ImGui::Button("Rage - No Smooth"))
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 0,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth = 0,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov = 180,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov = 180,
+							Settings::Aimbot::aim_Backtrack = true,
+							Settings::Aimbot::aim_DrawBacktrack = true,
+							Settings::Aimbot::aim_Backtracktickrate = 12,
+							Settings::Aimbot::aim_WallAttack = true;
+						ImGui::SameLine(SpaceLineTwo);
+
+						if (ImGui::Button("Obvious - Barely Smooth"))
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 200,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov = 120,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov = 70,
+							Settings::Aimbot::aim_Backtrack = true,
+							Settings::Aimbot::aim_DrawBacktrack = true,
+							Settings::Aimbot::aim_Backtracktickrate = 10,
+							Settings::Aimbot::aim_WallAttack = true;
+						ImGui::SameLine(SpaceLineFour);
+
+
+
+						if (ImGui::Button("Human - Great Smooth"))
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 700,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth = 250,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov = 65,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov = 25,
+							Settings::Aimbot::aim_CheckSmoke = true,
+							Settings::Aimbot::aim_CheckFlash = true,
+							Settings::Aimbot::aim_Backtrack = true,
+							Settings::Aimbot::aim_DrawBacktrack = true,
+							Settings::Aimbot::aim_Backtracktickrate = 4;
+
+						if (ImGui::Button("Totally Obvious - Almost no smooth"))
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 50,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth = 40,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx = 95,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy = 94,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov = 150,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov = 150,
+							Settings::Aimbot::aim_Backtrack = true,
+							Settings::Aimbot::aim_DrawBacktrack = true,
+							Settings::Aimbot::aim_Backtracktickrate = 12,
+							Settings::Aimbot::aim_WallAttack = true;
+						ImGui::SameLine(SpaceLineTwo);
+
+
+						if (ImGui::Button("Unhuman - Average Smooth"))
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 350,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth = 200,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov = 90,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov = 45,
+							Settings::Aimbot::aim_CheckSmoke = true,
+							Settings::Aimbot::aim_CheckFlash = true,
+							Settings::Aimbot::aim_Backtrack = true,
+							Settings::Aimbot::aim_DrawBacktrack = true,
+							Settings::Aimbot::aim_Backtracktickrate = 8;
+						ImGui::SameLine(SpaceLineFour);
+
+						if (ImGui::Button("Overlegit - Ultra Smooth"))
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Smooth = 1000,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth = 350,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy = 100,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Fov = 40,
+							Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov = 10,
+							Settings::Aimbot::aim_CheckSmoke = true,
+							Settings::Aimbot::aim_CheckFlash = true,
+							Settings::Aimbot::aim_AntiJump = true;
+
+
+
 					}
-					ImGui::Checkbox("Show Team", &Settings::Radar::rad_Team);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Show Enemy", &Settings::Radar::rad_Enemy);
-					ImGui::PushItemWidth(280.f);
-					ImGui::SliderInt("Range", &Settings::Radar::rad_Range, 1, 5000);
-					ImGui::SliderInt("Alpha", &Settings::Radar::rad_Alpha, 1, 255);
-					ImGui::PopItemWidth();
-					ImGui::ColorEdit3("Color CT", Settings::Radar::rad_Color_CT);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Color visible CT", Settings::Radar::rad_Color_VCT);
-					ImGui::ColorEdit3("Color TT", Settings::Radar::rad_Color_TT);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Color visible TT", Settings::Radar::rad_Color_VTT);
+					if (otherpages == 2)
+					{
 
-				}ImGui::EndChild(); ImGui::SameLine();
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
 
-				ImGui::BeginChild("##Esp", ImVec2(431, -1), true);
+						ImGui::PushItemWidth(200.f);
+						ImGui::Combo("RCS Clamp", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsClampType, ClampType, IM_ARRAYSIZE(ClampType));
+
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::SliderInt("RCS Amounth X", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsx, 1, 100);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Reduces the Recoil - Left and Right");
+						ImGui::SliderInt("RCS Amounth Y", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_Rcsy, 1, 100);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Reduces the Recoil - Up and Down");
+						ImGui::SliderInt("RCS Fov", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsFov, 1, 180);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Anti Recoil Amount - High Fov = Low Recoil");
+						ImGui::Spacing();
+
+						ImGui::SliderInt("RCS Smooth", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth, 1, 360);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Smooths your Anti Recoil - High Amount = Legit Anti Recoil");
+						ImGui::SliderInt("RCS UltraSmooth", &Settings::Aimbot::weapon_aim_settings[iWeaponID].aim_RcsSmooth, 1, 3000);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Ultra Smoothnes - Change it up to 3000 for Extreme Smooth Aimbot");
+					}
+
+
+
+				}
+
+				ImGui::EndChild();
+				ImGui::EndGroup();
+				//------------------------------------------------------------------------------Visuals-----------------------------------------------------------------------
+			}
+			else if (tabSelected == 2) // Visuals
+			{
+
+				g_pGui->bluefont();
+				ImGui::BeginGroup();
+				ImGui::BeginChild(1, ImVec2(-1, 680), true);
 				{
-					ImGui::Text("Other");
-					ImGui::Separator();
+					const char* iHitSound[] =
+					{
+						"Off",
+						"Default",
+						"Anime",
+						"Roblox",
+						"GameSense",
+						"German",
+						"HeadMeme",
+						"FadeCSGO.tk"
+					};
+
+					const char* material_items[] =
+					{
+						"glass",
+						"crystal",
+						"dark gold",
+						"dark chrome",
+						"plastic glass",
+						"velvet",
+						"crystal blue",
+						"bright gold"
+					};
+
 
 					string style_1 = "None";
 					string style_2 = "Box";
-					string style_3 = "Frame";
-					string style_4 = "Genuine";
-					const char* items1[] = { style_1.c_str() , style_2.c_str() , style_3.c_str() , style_4.c_str() };
+					string style_3 = "Coal Box";
+					string style_4 = "Genuine box";
+					string style_5 = "Alpha box";
+					const char* items1[] = { style_1.c_str() , style_2.c_str() , style_3.c_str(), style_4.c_str(), style_5.c_str() };
 
-					ImGui::PushItemWidth(130.f);
-					ImGui::Combo("Box Type", &Settings::Esp::esp_Style, items1, IM_ARRAYSIZE(items1));
-					ImGui::SameLine();
-					ImGui::Checkbox("Outline", &Settings::Esp::esp_Outline);
-					ImGui::SameLine();
-					ImGui::Checkbox("Esp Wall", &Settings::Esp::esp_Visible);
-
-					ImGui::Spacing();
-
-					ImGui::Text("Info Health & Armor");
-					ImGui::Separator();
-					string hpbar_1 = "None";
-					string hpbar_2 = "Number";
-					string hpbar_3 = "Bottom";
-					string hpbar_4 = "Left";
-					string hpbar_5 = "Edgy";
-					const char* items3[] = { hpbar_1.c_str() , hpbar_2.c_str() , hpbar_3.c_str() , hpbar_4.c_str() , hpbar_5.c_str() };
-
-					ImGui::PushItemWidth(130.f);
-					ImGui::Combo("Health", &Settings::Esp::esp_Health, items3, IM_ARRAYSIZE(items3));
-					ImGui::PopItemWidth();
-
-					string arbar_1 = "None";
-					string arbar_2 = "Number";
-					string arbar_3 = "Bottom";
-					string arbar_4 = "Right";
-					string arbar_5 = "Edgy";
-					const char* items4[] = { arbar_1.c_str() , arbar_2.c_str() , arbar_3.c_str() , arbar_4.c_str() , arbar_5.c_str() };
-
-					ImGui::PushItemWidth(130.f);
-					ImGui::SameLine(SpaceLineEsp);
-					ImGui::Combo("Armor", &Settings::Esp::esp_Armor, items4, IM_ARRAYSIZE(items4));
-					ImGui::PopItemWidth();
-
-					ImGui::Spacing();
-
-					ImGui::Text("Chams");
-					ImGui::Separator();
-					string chams_1 = "None";
-					string chams_2 = "Flat";
-					string chams_3 = "Texture";
-					string chams_4 = "Material";
-					const char* items5[] = { chams_1.c_str() , chams_2.c_str() , chams_3.c_str(), chams_4.c_str() };
-
-					ImGui::PushItemWidth(130.f);
-					ImGui::Combo("Chams", &Settings::Esp::esp_Chams, items5, IM_ARRAYSIZE(items5));
-					ImGui::SameLine();
-					ImGui::Checkbox("Chams Wall", &Settings::Esp::esp_ChamsVisible);
-					if (Settings::Esp::esp_Chams == 3)
+					const char* armtype_items[] =
 					{
-						ImGui::SliderInt("Light of Chams", &Settings::Esp::esp_Chams_Light, 1, 255);
-					}
-
-					ImGui::Spacing();
-
-					ImGui::Text("ESP World");
-					ImGui::Separator();
-					ImGui::Checkbox("Drop Weapon", &Settings::Esp::esp_WorldWeapons);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::Checkbox("Drop Grenade", &Settings::Esp::esp_WorldGrenade);
-
-					ImGui::Spacing();
-
-					ImGui::Text("Colors");
-					ImGui::Separator();
-					ImGui::ColorEdit3("Esp Color CT", Settings::Esp::esp_Color_CT);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Esp Vis CT", Settings::Esp::esp_Color_VCT);
-					ImGui::ColorEdit3("Chams CT", Settings::Esp::chams_Color_CT);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Chams Vis CT", Settings::Esp::chams_Color_VCT);
-					ImGui::ColorEdit3("Esp Color T", Settings::Esp::esp_Color_TT);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Esp Vis T", Settings::Esp::esp_Color_VTT);
-					ImGui::ColorEdit3("Chams T", Settings::Esp::chams_Color_TT);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Chams Vis T", Settings::Esp::chams_Color_VTT);
-					ImGui::ColorEdit3("Esp Line", Settings::Esp::Visuals_Line_Color);
-					ImGui::SameLine(SpaceLineFiv);
-					ImGui::ColorEdit3("Drop Weapon", Settings::Esp::WorldWeapon_Color);
-
-				}ImGui::EndChild();
-
-			}
-
-			else if (tabSelected == 2) // Skins
-			{
-				ImGui::BeginChild("##knifechanger", ImVec2(284, -1), true);
-				{
-					//[enc_string_disable /]
-					const char* knife_models_items[] =
-					{
-						"Default","Bayonet","Flip","Gut","Karambit" ,"M9 Bayonet",
-						"Huntsman","Falchion","Bowie","Butterfly","Shadow Daggers", "Navaja", "Stiletto",
-						"Ursus", "Talon"
-
+						"arms only",
+						"arms and weapon"
 					};
 
-					//[enc_string_enable /]
-
-					static int iSelectKnifeCTSkinIndex = -1;
-					static int iSelectKnifeTTSkinIndex = -1;
-
-					int iKnifeCTModelIndex = Settings::Skin::knf_ct_model;
-					int iKnifeTTModelIndex = Settings::Skin::knf_tt_model;
-
-					static int iOldKnifeCTModelIndex = -1;
-					static int iOldKnifeTTModelIndex = -1;
-
-					if (iOldKnifeCTModelIndex != iKnifeCTModelIndex && Settings::Skin::knf_ct_model)
-						iSelectKnifeCTSkinIndex = GetKnifeSkinIndexFromPaintKit(Settings::Skin::knf_ct_skin, false);
-
-					if (iOldKnifeTTModelIndex != iKnifeTTModelIndex && Settings::Skin::knf_tt_model)
-						iSelectKnifeTTSkinIndex = GetKnifeSkinIndexFromPaintKit(Settings::Skin::knf_ct_skin, true);
-
-					iOldKnifeCTModelIndex = iKnifeCTModelIndex;
-					iOldKnifeTTModelIndex = iKnifeTTModelIndex;
-
-					string KnifeCTModel = knife_models_items[Settings::Skin::knf_ct_model];
-					string KnifeTTModel = knife_models_items[Settings::Skin::knf_tt_model];
-
-					ImGui::PushItemWidth(210.f);
-					ImGui::Combo("Knife CT", &Settings::Skin::knf_ct_model, knife_models_items, IM_ARRAYSIZE(knife_models_items));
-					ImGui::ComboBoxArray(KnifeCTModel.c_str(), &iSelectKnifeCTSkinIndex, KnifeSkins[iKnifeCTModelIndex].SkinNames);
-					ImGui::SliderFloat("Wear CT", &g_SkinChangerCfg[WEAPON_KNIFE].flFallbackWear, 0.000f, 1.f);
-					ImGui::SliderInt("Seed CT", &g_SkinChangerCfg[WEAPON_KNIFE].nFallbackSeed, 0, 1000);
-					ImGui::Separator();
-
-					ImGui::Spacing();;
-
-					ImGui::Combo("Knife TT", &Settings::Skin::knf_tt_model, knife_models_items, IM_ARRAYSIZE(knife_models_items));
-					ImGui::ComboBoxArray(KnifeTTModel.c_str(), &iSelectKnifeTTSkinIndex, KnifeSkins[iKnifeTTModelIndex].SkinNames);
-					ImGui::SliderFloat("Wear TT", &g_SkinChangerCfg[WEAPON_KNIFE_T].flFallbackWear, 0.000f, 1.f);
-					ImGui::SliderInt("Seed TT", &g_SkinChangerCfg[WEAPON_KNIFE_T].nFallbackSeed, 0, 1000);
-					ImGui::PopItemWidth();
-					
-					ImGui::Spacing();
-					ImGui::Spacing();
-
-					if (ImGui::Button("Apply Skins Knifes", ImVec2(265, 0)))
+					const char* skybox_items[] =
 					{
-					
-						if (iSelectKnifeCTSkinIndex >= 0) 
-						{
-							Settings::Skin::knf_ct_skin = KnifeSkins[iKnifeCTModelIndex].SkinPaintKit[iSelectKnifeCTSkinIndex];
-						}
-						if (iSelectKnifeTTSkinIndex >= 0) 
-						{
-							Settings::Skin::knf_tt_skin = KnifeSkins[iKnifeTTModelIndex].SkinPaintKit[iSelectKnifeTTSkinIndex];
-						}  
-
-						ForceFullUpdate();
-					}
-					
-			
-				}ImGui::EndChild();	ImGui::SameLine();
-
-				ImGui::BeginChild("##skinchanger", ImVec2(284, -1), true);
-				{
-					const char* knife_models_items[] =
-					{
-						"Default","Bayonet","Flip","Gut","Karambit" ,"M9 Bayonet",
-						"Huntsman","Falchion","Bowie","Butterfly","Shadow Daggers", "Navaja", "Stiletto",
-						"Ursus", "Talon"
-
+						"cs_baggage_skybox_",
+						"cs_tibet",
+						"embassy",
+						"italy",
+						"jungle",
+						"nukeblank",
+						"office",
+						"sky_cs15_daylight01_hdr",
+						"sky_cs15_daylight02_hdr",
+						"sky_cs15_daylight03_hdr",
+						"sky_cs15_daylight04_hdr",
+						"sky_csgo_cloudy01",
+						"sky_csgo_night02",
+						"sky_csgo_night02b",
+						"sky_csgo_night_flat",
+						"sky_day02_05_hdr",
+						"sky_day02_05",
+						"sky_dust",
+						"sky_l4d_rural02_ldr",
+						"sky_venice",
+						"vertigo_hdr",
+						"vertigoblue_hdr",
+						"vertigo",
+						"vietnam",
+						"amethyst",
+						"bartuc_canyon",
+						"bartuc_grey_sky",
+						"blue1",
+						"blue2",
+						"blue3",
+						"blue5",
+						"blue6",
+						"cssdefault",
+						"dark1",
+						"dark2",
+						"dark3",
+						"dark4",
+						"dark5",
+						"extreme_glaciation",
+						"green1",
+						"green2",
+						"green3",
+						"green4",
+						"green5",
+						"greenscreen",
+						"greysky",
+						"night1",
+						"night2",
+						"night3",
+						"night4",
+						"night5",
+						"orange1",
+						"orange2",
+						"orange3",
+						"orange4",
+						"orange5",
+						"orange6",
+						"persistent_fog",
+						"pink1",
+						"pink2",
+						"pink3",
+						"pink4",
+						"pink5",
+						"polluted_atm",
+						"toxic_atm",
+						"water_sunset﻿"
 					};
 
-					static int iSelectKnifeCTSkinIndex = -1;
-					static int iSelectKnifeTTSkinIndex = -1;
+					ImGui::Text("ESP");
+					ImGui::Separator();
 
-					int iKnifeCTModelIndex = Settings::Skin::knf_ct_model;
-					int iKnifeTTModelIndex = Settings::Skin::knf_tt_model;
 
-					static int iOldKnifeCTModelIndex = -1;
-					static int iOldKnifeTTModelIndex = -1;
 
-					if (iOldKnifeCTModelIndex != iKnifeCTModelIndex && Settings::Skin::knf_ct_model)
-						iSelectKnifeCTSkinIndex = GetKnifeSkinIndexFromPaintKit(Settings::Skin::knf_ct_skin, false);
+					static int otherpages = 0;
 
-					if (iOldKnifeTTModelIndex != iKnifeTTModelIndex && Settings::Skin::knf_tt_model)
-						iSelectKnifeTTSkinIndex = GetKnifeSkinIndexFromPaintKit(Settings::Skin::knf_ct_skin, true);
 
-					iOldKnifeCTModelIndex = iKnifeCTModelIndex;
-					iOldKnifeTTModelIndex = iKnifeTTModelIndex;
 
-					string KnifeCTModel = knife_models_items[Settings::Skin::knf_ct_model];
-					string KnifeTTModel = knife_models_items[Settings::Skin::knf_tt_model];
-
-					ImGui::Text("Weapon: %s", weapons[iWeaponID]);
-					static int iOldWeaponID = -1;
-
-					ImGui::PushItemWidth(210.f);
-					ImGui::Combo("Weapon##WeaponSelect", &iWeaponID, weapons, IM_ARRAYSIZE(weapons));
-					ImGui::PopItemWidth();
-
-					iWeaponSelectIndex = pWeaponItemIndexData[iWeaponID];
-
-					if (iOldWeaponID != iWeaponID)
-						iWeaponSelectSkinIndex = GetWeaponSkinIndexFromPaintKit(g_SkinChangerCfg[iWeaponSelectIndex].nFallbackPaintKit);
-
-					iOldWeaponID = iWeaponID;
-
-					string WeaponSkin = weapons[iWeaponID];
-
-					ImGui::PushItemWidth(210.f);
-					ImGui::ComboBoxArray(WeaponSkin.c_str(), &iWeaponSelectSkinIndex, WeaponSkins[iWeaponID].SkinNames);
-					ImGui::SliderFloat("Wear WP", &g_SkinChangerCfg[pWeaponItemIndexData[iWeaponID]].flFallbackWear, 0.000f, 1.f);
-					ImGui::SliderInt("Seed WP", &g_SkinChangerCfg[pWeaponItemIndexData[iWeaponID]].nFallbackSeed, 0, 1000);
-					ImGui::PopItemWidth();
-					
-					ImGui::Spacing();
-					ImGui::Spacing();
-
-					if (ImGui::Button("Apply Skins Weapons", ImVec2(265, 0)))
+					if (ImGui::Button("Esp", ImVec2(260.0f, 30.0f))) // <---- customize these to your liking.
 					{
-					
-						if (iWeaponSelectSkinIndex >= 0) 
+						otherpages = 0;
+					}
+					ImGui::SameLine();
+
+					if (ImGui::Button("Misc. visuals", ImVec2(260.0f, 30.0f))) // <---- again, customize to your liking.
+					{
+						otherpages = 1;
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Radar", ImVec2(260.0f, 30.0f))) // <---- again, customize to your liking.
+					{
+						otherpages = 2;
+					}
+
+
+
+					if (otherpages == 0)
+					{
+						static int otherpages = 0;
+
+
+
+						if (ImGui::Button("Visuals", ImVec2(126.0f, 25.0f))) // <---- customize these to your liking.
 						{
-							g_SkinChangerCfg[iWeaponSelectIndex].nFallbackPaintKit = WeaponSkins[iWeaponID].SkinPaintKit[iWeaponSelectSkinIndex];
+							otherpages = 0;
 						}
-					
-						ForceFullUpdate();
-					}
-					
-            
-				}ImGui::EndChild();	ImGui::SameLine();
-
-				ImGui::BeginChild("##glovechanger", ImVec2(284, -1), true);
-				{
-					ImGui::Text("Gloves");
-					ImGui::Separator();
-
-					ImGui::PushItemWidth(210.f);
-					ImGui::Combo("Glove##GloveSelect", &Settings::Skin::gloves_skin, gloves_listbox_items, IM_ARRAYSIZE(gloves_listbox_items));
-					ImGui::PopItemWidth();
-
-					ImGui::Text("Custom Skins");
-					ImGui::Separator();
-
-					ImGui::PushItemWidth(210.f);
-					ImGui::InputInt("Knife CT", &Settings::Skin::knf_ct_skin);
-					ImGui::InputInt("Knife TT", &Settings::Skin::knf_tt_skin);
-					ImGui::Combo("Weapon##WeaponSelect", &iWeaponID, weapons, IM_ARRAYSIZE(weapons));
-					ImGui::InputInt("Weapon", &g_SkinChangerCfg[pWeaponItemIndexData[iWeaponID]].nFallbackPaintKit);
-					ImGui::PopItemWidth();
-
-					ImGui::Spacing();
-					ImGui::Spacing();
-
-					ImGui::BeginChild("##childstick", ImVec2(265, 325), true); // uffja
-					{
-						static ImGuiTextFilter filter;
-						filter.Draw();
-						const char* lines[] =
-						{
-							"2: Groundwater",
-							"3: Candy Apple",
-							"5: Forest DDPAT",
-							"6: Arctic Camo",
-							"8: Desert Storm",
-							"9: Bengal Tiger",
-							"10: Copperhead",
-							"11: Skulls",
-							"12: Crimson Web",
-							"13: Blue Streak",
-							"14: Red Laminate",
-							"15: Gunsmoke",
-							"16: Jungle Tiger",
-							"17: Urban DDPAT",
-							"20: Virus",
-							"21: Granite Marbleized",
-							"22: Contrast Spray",
-							"25: Forest Leaves",
-							"26: Lichen Dashed",
-							"27: Bone Mask",
-							"28: Anodized Navy",
-							"30: Snake Camo",
-							"32: Silver",
-							"33: Hot Rod",
-							"34: Metallic DDPAT",
-							"36: Ossified",
-							"37: Blaze",
-							"38: Fade",
-							"39: Bulldozer",
-							"40: Night",
-							"41: Copper",
-							"42: Blue Steel",
-							"43: Stained",
-							"44: Case Hardened",
-							"46: Contractor",
-							"47: Colony",
-							"48: Dragon Tattoo",
-							"51: Lightning Strike",
-							"59: Slaughter",
-							"60: Dark Water",
-							"61: Hypnotic",
-							"62: Bloomstick",
-							"67: Cold Blooded",
-							"70: Carbon Fiber",
-							"71: Scorpion",
-							"72: Safari Mesh",
-							"73: Wings",
-							"74: Polar Camo",
-							"75: Blizzard Marbleized",
-							"76: Winter Forest",
-							"77: Boreal Forest",
-							"78: Forest Night",
-							"83: Orange DDPAT",
-							"84: Pink DDPAT",
-							"90: Mudder",
-							"92: Cyanospatter",
-							"93: Caramel",
-							"95: Grassland",
-							"96: Blue Spruce",
-							"98: Ultraviolet",
-							"99: Sand Dune",
-							"100: Storm",
-							"101: Tornado",
-							"102: Whiteout",
-							"104: Grassland Leaves",
-							"107: Polar Mesh",
-							"110: Condemned",
-							"111: Glacier Mesh",
-							"116: Sand Mesh",
-							"119: Sage Spray",
-							"122: Jungle Spray",
-							"124: Sand Spray",
-							"135: Urban Perforated",
-							"136: Waves Perforated",
-							"141: Orange Peel",
-							"143: Urban Masked",
-							"147: Jungle Dashed",
-							"148: Sand Dashed",
-							"149: Urban Dashed",
-							"151: Jungle",
-							"153: Demolition",
-							"154: Afterimage",
-							"155: Bullet Rain",
-							"156: Death by Kitty",
-							"157: Palm",
-							"158: Walnut",
-							"159: Brass",
-							"162: Splash",
-							"164: Modern Hunter",
-							"165: Splash Jam",
-							"166: Blaze Orange",
-							"167: Radiation Hazard",
-							"168: Nuclear Threat",
-							"169: Fallout Warning",
-							"170: Predator",
-							"171: Irradiated Alert",
-							"172: Black Laminate",
-							"174: BOOM",
-							"175: Scorched",
-							"176: Faded Zebra",
-							"177: Memento",
-							"178: Doomkitty",
-							"179: Nuclear Threat",
-							"180: Fire Serpent",
-							"181: Corticera",
-							"182: Emerald Dragon",
-							"183: Overgrowth",
-							"184: Corticera",
-							"185: Golden Koi",
-							"186: Wave Spray",
-							"187: Zirka",
-							"188: Graven",
-							"189: Bright Water",
-							"190: Black Limba",
-							"191: Tempest",
-							"192: Shattered",
-							"193: Bone Pile",
-							"194: Spitfire",
-							"195: Demeter",
-							"196: Emerald",
-							"197: Anodized Navy",
-							"198: Hazard",
-							"199: Dry Season",
-							"200: Mayan Dreams",
-							"201: Palm",
-							"202: Jungle DDPAT",
-							"203: Rust Coat",
-							"204: Mosaico",
-							"205: Jungle",
-							"206: Tornado",
-							"207: Facets",
-							"208: Sand Dune",
-							"209: Groundwater",
-							"210: Anodized Gunmetal",
-							"211: Ocean Foam",
-							"212: Graphite",
-							"213: Ocean Foam",
-							"214: Graphite",
-							"215: X-Ray",
-							"216: Blue Titanium",
-							"217: Blood Tiger",
-							"218: Hexane",
-							"219: Hive",
-							"220: Hemoglobin",
-							"221: Serum",
-							"222: Blood in the Water",
-							"223: Nightshade",
-							"224: Water Sigil",
-							"225: Ghost Camo",
-							"226: Blue Laminate",
-							"227: Electric Hive",
-							"228: Blind Spot",
-							"229: Azure Zebra",
-							"230: Steel Disruption",
-							"231: Cobalt Disruption",
-							"232: Crimson Web",
-							"233: Tropical Storm",
-							"234: Ash Wood",
-							"235: VariCamo",
-							"236: Night Ops",
-							"237: Urban Rubble",
-							"238: VariCamo Blue",
-							"240: CaliCamo",
-							"241: Hunting Blind",
-							"242: Army Mesh",
-							"243: Gator Mesh",
-							"244: Teardown",
-							"245: Army Recon",
-							"246: Amber Fade",
-							"247: Damascus Steel",
-							"248: Red Quartz",
-							"249: Cobalt Quartz",
-							"250: Full Stop",
-							"251: Pit Viper",
-							"252: Silver Quartz",
-							"253: Acid Fade",
-							"254: Nitro",
-							"255: Asiimov",
-							"256: The Kraken",
-							"257: Guardian",
-							"258: Mehndi",
-							"259: Redline",
-							"260: Pulse",
-							"261: Marina",
-							"262: Rose Iron",
-							"263: Rising Skull",
-							"264: Sandstorm",
-							"265: Kami",
-							"266: Magma",
-							"267: Cobalt Halftone",
-							"268: Tread Plate",
-							"269: The Fuschia Is Now",
-							"270: Victoria",
-							"271: Undertow",
-							"272: Titanium Bit",
-							"273: Heirloom",
-							"274: Copper Galaxy",
-							"275: Red FragCam",
-							"276: Panther",
-							"277: Stainless",
-							"278: Blue Fissure",
-							"279: Asiimov",
-							"280: Chameleon",
-							"281: Corporal",
-							"282: Redline",
-							"283: Trigon",
-							"284: Heat",
-							"285: Terrain",
-							"286: Antique",
-							"287: Pulse",
-							"288: Sergeant",
-							"289: Sandstorm",
-							"290: Guardian",
-							"291: Heaven Guard",
-							"293: Death Rattle",
-							"294: Green Apple",
-							"295: Franklin",
-							"296: Meteorite",
-							"297: Tuxedo",
-							"298: Army Sheen",
-							"299: Caged Steel",
-							"300: Emerald Pinstripe",
-							"301: Atomic Alloy",
-							"302: Vulcan",
-							"303: Isaac",
-							"304: Slashed",
-							"305: Torque",
-							"306: Antique",
-							"307: Retribution",
-							"308: Kami",
-							"309: Howl",
-							"310: Curse",
-							"311: Desert Warfare",
-							"312: Cyrex",
-							"313: Orion",
-							"314: Heaven Guard",
-							"315: Poison Dart",
-							"316: Jaguar",
-							"317: Bratatat",
-							"318: Road Rash",
-							"319: Detour",
-							"320: Red Python",
-							"321: Master Piece",
-							"322: Nitro",
-							"323: Rust Coat",
-							"325: Chalice",
-							"326: Knight",
-							"327: Chainmail",
-							"328: Hand Cannon",
-							"329: Dark Age",
-							"330: Briar",
-							"332: Royal Blue",
-							"333: Indigo",
-							"334: Twist",
-							"335: Module",
-							"336: Desert-Strike",
-							"337: Tatter",
-							"338: Pulse",
-							"339: Caiman",
-							"340: Jet Set",
-							"341: First Class",
-							"342: Leather",
-							"343: Commuter",
-							"344: Dragon Lore",
-							"345: First Class",
-							"346: Coach Class",
-							"347: Pilot",
-							"348: Red Leather",
-							"349: Osiris",
-							"350: Tigris",
-							"351: Conspiracy",
-							"352: Fowl Play",
-							"353: Water Elemental",
-							"354: Urban Hazard",
-							"355: Desert-Strike",
-							"356: Koi",
-							"357: Ivory",
-							"358: Supernova",
-							"359: Asiimov",
-							"360: Cyrex",
-							"361: Abyss",
-							"362: Labyrinth",
-							"363: Traveler",
-							"364: Business Class",
-							"365: Olive Plaid",
-							"366: Green Plaid",
-							"367: Reactor",
-							"368: Setting Sun",
-							"369: Nuclear Waste",
-							"370: Bone Machine",
-							"371: Styx",
-							"372: Nuclear Garden",
-							"373: Contamination",
-							"374: Toxic",
-							"375: Radiation Hazard",
-							"376: Chemical Green",
-							"377: Hot Shot",
-							"378: Fallout Warning",
-							"379: Cerberus",
-							"380: Wasteland Rebel",
-							"381: Grinder",
-							"382: Murky",
-							"383: Basilisk",
-							"384: Griffin",
-							"385: Firestarter",
-							"386: Dart",
-							"387: Urban Hazard",
-							"388: Cartel",
-							"389: Fire Elemental",
-							"390: Highwayman",
-							"391: Cardiac",
-							"392: Delusion",
-							"393: Tranquility",
-							"394: Cartel",
-							"395: Man-o'-war",
-							"396: Urban Shock",
-							"397: Naga",
-							"398: Chatterbox",
-							"399: Catacombs",
-							"400: 龍王 (Dragon King)",
-							"401: System Lock",
-							"402: Malachite",
-							"403: Deadly Poison",
-							"404: Muertos",
-							"405: Serenity",
-							"406: Grotto",
-							"407: Quicksilver",
-							"409: Tiger Tooth",
-							"410: Damascus Steel",
-							"411: Damascus Steel",
-							"413: Marble Fade",
-							"414: Rust Coat",
-							"415: Doppler",
-							"416: Doppler",
-							"417: Doppler",
-							"418: Doppler",
-							"419: Doppler",
-							"420: Doppler",
-							"421: Doppler",
-							"422: Elite Build",
-							"423: Armor Core",
-							"424: Worm God",
-							"425: Bronze Deco",
-							"426: Valence",
-							"427: Monkey Business",
-							"428: Eco",
-							"429: Djinn",
-							"430: Hyper Beast",
-							"431: Heat",
-							"432: Man-o'-war",
-							"433: Neon Rider",
-							"434: Origami",
-							"435: Pole Position",
-							"436: Grand Prix",
-							"437: Twilight Galaxy",
-							"438: Chronos",
-							"439: Hades",
-							"440: Icarus Fell",
-							"441: Minotaur's Labyrinth",
-							"442: Asterion",
-							"443: Pathfinder",
-							"444: Daedalus",
-							"445: Hot Rod",
-							"446: Medusa",
-							"447: Duelist",
-							"448: Pandora's Box",
-							"449: Poseidon",
-							"450: Moon in Libra",
-							"451: Sun in Leo",
-							"452: Shipping Forecast",
-							"453: Emerald",
-							"454: Para Green",
-							"455: Akihabara Accept",
-							"456: Hydroponic",
-							"457: Bamboo Print",
-							"458: Bamboo Shadow",
-							"459: Bamboo Forest",
-							"460: Aqua Terrace",
-							"462: Counter Terrace",
-							"463: Terrace",
-							"464: Neon Kimono",
-							"465: Orange Kimono",
-							"466: Crimson Kimono",
-							"467: Mint Kimono",
-							"468: Midnight Storm",
-							"469: Sunset Storm 壱",
-							"470: Sunset Storm 弐",
-							"471: Daybreak",
-							"472: Impact Drill",
-							"473: Seabird",
-							"474: Aquamarine Revenge",
-							"475: Hyper Beast",
-							"476: Yellow Jacket",
-							"477: Neural Net",
-							"478: Rocket Pop",
-							"479: Bunsen Burner",
-							"480: Evil Daimyo",
-							"481: Nemesis",
-							"482: Ruby Poison Dart",
-							"483: Loudmouth",
-							"484: Ranger",
-							"485: Handgun",
-							"486: Elite Build",
-							"487: Cyrex",
-							"488: Riot",
-							"489: Torque",
-							"490: Frontside Misty",
-							"491: Dualing Dragons",
-							"492: Survivor Z",
-							"493: Flux",
-							"494: Stone Cold",
-							"495: Wraiths",
-							"496: Nebula Crusader",
-							"497: Golden Coil",
-							"498: Rangeen",
-							"499: Cobalt Core",
-							"500: Special Delivery",
-							"501: Wingshot",
-							"502: Green Marine",
-							"503: Big Iron",
-							"504: Kill Confirmed",
-							"505: Scumbria",
-							"506: Point Disarray",
-							"507: Ricochet",
-							"508: Fuel Rod",
-							"509: Corinthian",
-							"510: Retrobution",
-							"511: The Executioner",
-							"512: Royal Paladin",
-							"514: Power Loader",
-							"515: Imperial",
-							"516: Shapewood",
-							"517: Yorick",
-							"518: Outbreak",
-							"519: Tiger Moth",
-							"520: Avalanche",
-							"521: Teclu Burner",
-							"522: Fade",
-							"523: Amber Fade",
-							"524: Fuel Injector",
-							"525: Elite Build",
-							"526: Photic Zone",
-							"527: Kumicho Dragon",
-							"528: Cartel",
-							"529: Valence",
-							"530: Triumvirate",
-							"532: Royal Legion",
-							"533: The Battlestar",
-							"534: Lapis Gator",
-							"535: Praetorian",
-							"536: Impire",
-							"537: Hyper Beast",
-							"538: Necropos",
-							"539: Jambiya",
-							"540: Lead Conduit",
-							"541: Fleet Flock",
-							"542: Judgement of Anubis",
-							"543: Red Astor",
-							"544: Ventilators",
-							"545: Orange Crash",
-							"546: Firefight",
-							"547: Spectre",
-							"548: Chantico's Fire",
-							"549: Bioleak",
-							"550: Oceanic",
-							"551: Asiimov",
-							"552: Fubar",
-							"553: Atlas",
-							"554: Ghost Crusader",
-							"555: Re-Entry",
-							"556: Primal Saber",
-							"557: Black Tie",
-							"558: Lore",
-							"559: Lore",
-							"560: Lore",
-							"561: Lore",
-							"562: Lore",
-							"563: Black Laminate",
-							"564: Black Laminate",
-							"565: Black Laminate",
-							"566: Black Laminate",
-							"567: Black Laminate",
-							"568: Gamma Doppler",
-							"569: Gamma Doppler",
-							"570: Gamma Doppler",
-							"571: Gamma Doppler",
-							"572: Gamma Doppler",
-							"573: Autotronic",
-							"574: Autotronic",
-							"575: Autotronic",
-							"576: Autotronic",
-							"577: Autotronic",
-							"578: Bright Water",
-							"579: Bright Water",
-							"580: Freehand",
-							"581: Freehand",
-							"582: Freehand",
-							"583: Aristocrat",
-							"584: Phobos",
-							"585: Violent Daimyo",
-							"586: Wasteland Rebel",
-							"587: Mecha Industries",
-							"588: Desolate Space",
-							"589: Carnivore",
-							"590: Exo",
-							"591: Imperial Dragon",
-							"592: Iron Clad",
-							"593: Chopper",
-							"594: Harvester",
-							"595: Reboot",
-							"596: Limelight",
-							"597: Bloodsport",
-							"598: Aerial",
-							"599: Ice Cap",
-							"600: Neon Revolution",
-							"601: Syd Mead",
-							"602: Imprint",
-							"603: Directive",
-							"604: Roll Cage",
-							"605: Scumbria",
-							"606: Ventilator",
-							"607: Weasel",
-							"608: Petroglyph",
-							"609: Airlock",
-							"610: Dazzle",
-							"611: Grim",
-							"612: Powercore",
-							"613: Triarch",
-							"614: Fuel Injector",
-							"615: Briefing",
-							"616: Slipstream",
-							"617: Doppler",
-							"618: Doppler",
-							"619: Doppler",
-							"620: Ultraviolet",
-							"621: Ultraviolet",
-							"622: Polymer",
-							"623: Ironwork",
-							"624: Dragonfire",
-							"625: Royal Consorts",
-							"626: Mecha Industries",
-							"627: Cirrus",
-							"628: Stinger",
-							"629: Black Sand",
-							"630: Sand Scale",
-							"631: Flashback",
-							"632: Buzz Kill",
-							"633: Sonar",
-							"634: Gila",
-							"635: Turf",
-							"636: Shallow Grave",
-							"637: Cyrex",
-							"638: Wasteland Princess",
-							"639: Bloodsport",
-							"640: Fever Dream",
-							"641: Jungle Slipstream",
-							"642: Blueprint",
-							"643: Xiangliu",
-							"644: Decimator",
-							"645: Oxide Blaze",
-							"646: Capillary",
-							"647: Crimson Tsunami",
-							"648: Emerald Poison Dart",
-							"649: Akoben",
-							"650: Ripple",
-							"651: Last Dive",
-							"652: Scaffold",
-							"653: Neo-Noir",
-							"654: Seasons",
-							"655: Zander",
-							"656: Orbit Mk01",
-							"657: Blueprint",
-							"658: Cobra Strike",
-							"659: Macabre",
-							"660: Hyper Beast",
-							"661: Sugar Rush",
-							"662: Oni Taiji",
-							"663: Briefing",
-							"664: Hellfire",
-							"665: Aloha",
-							"666: Hard Water",
-							"667: Woodsman",
-							"668: Red Rock",
-							"669: Death Grip",
-							"670: Death's Head",
-							"671: Cut Out",
-							"672: Metal Flowers",
-							"673: Morris",
-							"674: Triqua",
-							"675: The Empress",
-							"676: High Roller",
-							"677: Hunter",
-							"678: See Ya Later",
-							"679: Goo",
-							"680: Off World",
-							"681: Leaded Glass",
-							"682: Oceanic",
-							"683: Llama Cannon",
-							"684: Cracked Opal",
-							"685: Jungle Slipstream",
-							"686: Phantom",
-							"687: Tacticat",
-							"688: Exposure",
-							"689: Ziggy",
-							"690: Stymphalian",
-							"691: Mortis",
-							"692: Night Riot",
-							"693: Flame Test",
-							"694: Moonrise",
-							"695: Neo-Noir",
-							"696: Bloodsport",
-							"697: Black Sand",
-							"698: Lionfish",
-							"699: Wild Six",
-							"700: Urban Hazard",
-							"701: Grip",
-							"702: Aloha",
-							"703: SWAG-7",
-							"704: Arctic Wolf",
-							"705: Cortex",
-							"706: Oxide Blaze",
-						};
-						for (int i = 0; i < IM_ARRAYSIZE(lines); i++)
-							if (filter.PassFilter(lines[i]))
-								ImGui::Text("%s", lines[i]);
-					}
-					ImGui::EndChild();
-
-					ImGui::Spacing();
-					ImGui::Spacing();
-
-					if (ImGui::Button("Apply Custom Skins & Gloves", ImVec2(265, 0)))
-					{
-						ForceFullUpdate();
-					}
-
-				}ImGui::EndChild();	ImGui::SameLine();
-
-
-			}
-
-			else if (tabSelected == 3) // Misc
-			{
-					ImGui::BeginChild("##Misc", ImVec2(431, -1), true);
-					{
-						ImGui::Text("Map Settings");
-						ImGui::ColorEdit3("Ambient Light", Settings::Esp::esp_Ambient);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("Night Mode", &Settings::Esp::esp_NightMode);
-						ImGui::SameLine(SpaceLineTwo);
-						ImGui::Checkbox("Dlight", &Settings::Esp::esp_Dlightz);
 						ImGui::SameLine();
-						ImGui::ColorEdit3("Dlight Color", Settings::Esp::esp_Dlight);
+						if (ImGui::Button("Options", ImVec2(126.0f, 25.0f))) // <---- again, customize to your liking.
+						{
+							otherpages = 1;
+						}
 
+						ImGui::Separator();
+
+						if (otherpages == 0)
+						{
+
+
+
+							ImGui::PushItemWidth(339.f);
+							ImGui::Combo("Esp Type", &Settings::Esp::esp_Style, items1, IM_ARRAYSIZE(items1));
+							ImGui::PopItemWidth();
+
+
+							ImGui::Spacing();
+
+							ImGui::BeginGroup();
+
+							ImGui::PushItemWidth(150.f);
+							ImGui::BeginChild("first child", ImVec2(135, 120), true);
+							{
+								ImGui::Checkbox("Team Esp", &Settings::Esp::esp_Team);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Render Teammates");
+								ImGui::Checkbox("Enemy Esp", &Settings::Esp::esp_Enemy);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Render Enemies");
+								ImGui::Checkbox("Skeleton", &Settings::Esp::esp_Skeleton);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Rendering of bones of enemies");
+								ImGui::Checkbox("Outline", &Settings::Esp::esp_Outline);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Draws black outline over box");
+
+							}
+							ImGui::EndChild();
+							ImGui::PopItemWidth();
+							ImGui::EndGroup();
+
+							ImGui::SameLine(SpaceLineBoxOne);
+
+							ImGui::BeginGroup();
+							ImGui::PushItemWidth(300.f);
+							ImGui::BeginChild("Second child", ImVec2(200, 120), true);
+							{
+								ImGui::Checkbox("Name Esp", &Settings::Esp::esp_Name);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Renders name of players");
+								ImGui::Checkbox("Bomb Esp", &Settings::Esp::esp_Bomb);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("renders position of bomb on players and when planted");
+								ImGui::Checkbox("Weapon Esp", &Settings::Esp::esp_Weapon);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("renders text of current weapon held by enemies");
+								ImGui::Checkbox("Player Status", &Settings::Esp::esp_Statusx);
+								{
+									if (!Interfaces::Engine()->IsInGame())
+										Settings::Esp::esp_Statusx;
+								}
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Maybe Crashs - renders text of current status for enemies for example (is defusing) - Disabled in Main Menu (crashfix)");
+
+							}
+							ImGui::EndChild(); //ends the child
+							ImGui::PopItemWidth(); //pops the item width
+							ImGui::EndGroup(); //ends the group
+
+
+							ImGui::SameLine(SpaceLineBoxTwo);
+
+							ImGui::BeginGroup(); //begins the group
+							ImGui::PushItemWidth(300.f); //item width
+							ImGui::BeginChild("Third Child", ImVec2(145, 120), true); //begins the child and the size of the child.
+							{
+								ImGui::Checkbox("Reveal Ranks", &Settings::Esp::esp_Rank);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("in scoreboard - buggy");
+								ImGui::Checkbox("Sound Esp", &Settings::Esp::esp_Sound);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Draws each hearable footstep - buggy");
+								ImGui::Checkbox("Line Esp", &Settings::Esp::esp_Line);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("draws line to enemy");
+								ImGui::Checkbox("Distance Esp", &Settings::Esp::esp_Distance);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("renders text for distance between you and enemy");
+							}
+							ImGui::EndChild(); //ends the child
+							ImGui::PopItemWidth(); //pops the item width
+							ImGui::EndGroup(); //ends the group
+
+							ImGui::SameLine(SpaceLineBoxThr);
+
+							ImGui::BeginGroup(); //begins the group
+							ImGui::PushItemWidth(300.f); //item width
+							ImGui::BeginChild("fourth child", ImVec2(1200, 120), true); //begins the child and the size of the child.
+							{
+								ImGui::Checkbox("Ammo esp", &Settings::Esp::esp_Ammo);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Renders text of amount of ammunition enemy has");
+								ImGui::Checkbox("Last Build", &Settings::Esp::esp_Cheatbuild);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("renders time of last compilation in top left of screen");
+								ImGui::Checkbox("Watermark", &Settings::Esp::esp_Watermark);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("renders animated riptide rainbow text in top left of screen");
+								ImGui::Checkbox("Time", &Settings::Esp::esp_Time);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("renders current time in top left of screen");
+
+							}
+							ImGui::EndChild();
+							ImGui::PopItemWidth();
+							ImGui::EndGroup();
+
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							ImGui::Checkbox("Dlight", &Settings::Esp::esp_Dlightz);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Maybe crashs in Csgo Main Menu - Let Enemies and Teammates glow if Team / Enemy Esp is enabled");
+							{
+								if (!Interfaces::Engine()->IsInGame())
+									Settings::Esp::esp_Dlightz = false;
+							}
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::PushItemWidth(250.f);
+							ImGui::ColorEdit3("Dlight Color", Settings::Esp::esp_Dlight);
+							ImGui::PopItemWidth();
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							ImGui::Checkbox("dropped weapon esp", &Settings::Esp::esp_WorldWeapons);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("renders text of dropped weapons on them");
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::PushItemWidth(250.f);
+							ImGui::ColorEdit3("WW Color", Settings::Esp::WorldWeapon_Color);
+							ImGui::PopItemWidth();
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+
+							ImGui::Checkbox("Defusing", &Settings::Esp::esp_Defusing);
+							{
+								if (!Interfaces::Engine()->IsInGame())
+									Settings::Esp::esp_Defusing;
+							}
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Draws (Defusing) on Enemies if they Defuse - Disabled in Main Menu (crashfix)");
+
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::Checkbox("InScope", &Settings::Esp::esp_InScoped);
+							{
+								if (!Interfaces::Engine()->IsInGame())
+									Settings::Esp::esp_InScoped;
+							}
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Draws (Scoped) on Enemies if they are Scoping - Disabled in Main Menu (crashfix)");
+							ImGui::SameLine(SpaceLineThr);
+							ImGui::Checkbox("Flashed", &Settings::Esp::esp_Flashed);
+							{
+								if (!Interfaces::Engine()->IsInGame())
+									Settings::Esp::esp_Flashed;
+							}
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Draws (Flashed) on Enemies if they are Flashed - Disabled in Main Menu (crashfix)");
+
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							ImGui::Checkbox("Capslock Boxtoggle", &Settings::Esp::esp_CapitalToggle);
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::Checkbox("Fish Esp", &Settings::Esp::esp_Fish);
+							ImGui::SameLine(SpaceLineThr);
+							ImGui::Checkbox("Chicken Esp", &Settings::Esp::esp_Chicken);
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							/*	ImGui::Checkbox("Grenade Tracer", &Settings::Esp::esp_GrenadePrediction);
+								if (ImGui::IsItemHovered())
+									ImGui::SetTooltip("Draws a Line where the nade will hit - Disabled in Menu (crashfix)");
+								{
+									if (!Interfaces::Engine()->IsInGame())
+										Settings::Esp::esp_GrenadePrediction = false;
+								}*/
+
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::Checkbox("Grenade Boxes", &Settings::Esp::esp_WorldGrenade);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("renders 3D box around grenades regardless of type");
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							static bool sh_save_cfg = false;
+
+							if (ImGui::Checkbox("Grenade Helper", &Settings::Esp::helper))
+								sh_save_cfg = true;
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("buy a smoke, hold it in your hand, walk on a red circle, bottom left screen is info, throw as instructed at the green point.");
+
+
+							ImGui::SameLine();
+							if (ImGui::Button("update map"))
+								cGrenade.bUpdateGrenadeInfo(Interfaces::Engine()->GetLevelNameShort());
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Press this if Grenade Helper doesn't work - doesn't work on all maps");
+
+
+
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+
+							ImGui::Checkbox("Asus Walls", &Settings::Esp::esp_AsusWalls);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Changes Opacity of Walls");
+							ImGui::SliderInt("Walls Opacity	", &Settings::Esp::esp_WallsOpacity, 0, 100);
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							ImGui::ColorEdit3("Ambient Light", Settings::Esp::esp_Ambient);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("SMAC BAN - Changes World Color");
+							ImGui::Spacing();
+							ImGui::Checkbox("Night Mode", &Settings::Esp::esp_NightMode);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("SMAC BAN - Turns everything dark");
+							ImGui::SameLine(SpaceLineOne);
+
+
+
+
+							ImGui::Spacing();
+
+
+
+
+						}
+
+						if (otherpages == 1)
+						{
+
+
+
+							string chams_1 = "None";
+							string chams_2 = "Flat";
+							string chams_3 = "Texture";
+							const char* items5[] = { chams_1.c_str() , chams_2.c_str() , chams_3.c_str() };
+
+							string hpbar_1 = "None";
+							string hpbar_2 = "Number";
+							string hpbar_3 = "Bottom";
+							string hpbar_4 = "Left";
+							string hpbar_5 = "Edgy";
+
+							const char* items3[] = { hpbar_1.c_str() , hpbar_2.c_str() , hpbar_3.c_str() , hpbar_4.c_str(), hpbar_5.c_str() };
+
+							string arbar_1 = "None";
+							string arbar_2 = "Number";
+							string arbar_3 = "Bottom";
+							string arbar_4 = "Right";
+							string arbar_5 = "Edgy";
+
+							const char* items4[] = { arbar_1.c_str() , arbar_2.c_str() , arbar_3.c_str() , arbar_4.c_str(), arbar_5.c_str() };
+
+							const char* iHitSound[] =
+							{
+								"Off",
+								"Default",
+								"Anime",
+								"Roblox",
+								"GameSense",
+								"German",
+								"HeadMeme",
+								"FadeCSGO.tk"
+							};
+
+
+
+
+							ImGui::PushItemWidth(339.f);
+
+
+							ImGui::Spacing();
+
+							ImGui::Text("ESP Colours");
+							ImGui::Spacing();
+							ImGui::PushItemWidth(150.f);
+							ImGui::ColorEdit3("Esp CT", Settings::Esp::esp_Color_CT);
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::ColorEdit3("Esp Visible CT", Settings::Esp::esp_Color_VCT);
+
+							ImGui::ColorEdit3("Esp T", Settings::Esp::esp_Color_TT);
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::ColorEdit3("Esp Visible T", Settings::Esp::esp_Color_VTT);
+							ImGui::PopItemWidth();
+
+							ImGui::Spacing();
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Text("esp settings");
+							ImGui::Spacing();
+							ImGui::SliderInt("esp size", &Settings::Esp::esp_Size, 0, 10);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("size of each box");
+							ImGui::SliderInt("bomb timer", &Settings::Esp::esp_BombTimer, 0, 65);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("useful for community servers(?) where bomb timer is different");
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+
+							ImGui::Combo("Esp Health", &Settings::Esp::esp_Health, items3, IM_ARRAYSIZE(items3));
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("renders health of players");
+
+
+							ImGui::Combo("Esp Armor", &Settings::Esp::esp_Armor, items4, IM_ARRAYSIZE(items4));
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("renders armor of players");
+
+							ImGui::Spacing();
+							ImGui::Separator();
+							ImGui::Spacing();
+							ImGui::Text("Chams Options");
+							ImGui::Spacing();
+
+							ImGui::Combo("Chams", &Settings::Esp::esp_Chams, items5, IM_ARRAYSIZE(items5));
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("fills player models with colour");
+
+							ImGui::Checkbox("Chams Wall", &Settings::Esp::esp_ChamsVisible);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Different Chams color if enemy is behind a Wall");
+							ImGui::Checkbox("Health Chams", &Settings::Esp::esp_HealthChams);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("Changes Chams color based on HP");
+
+							ImGui::Spacing();
+							ImGui::Spacing();
+
+							ImGui::PushItemWidth(150.f);
+							ImGui::ColorEdit3("Chams CT", Settings::Esp::chams_Color_CT);
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::ColorEdit3("Chams Visible CT", Settings::Esp::chams_Color_VCT);
+
+							ImGui::ColorEdit3("Chams T", Settings::Esp::chams_Color_TT);
+							ImGui::SameLine(SpaceLineTwo);
+							ImGui::ColorEdit3("Chams Visible T", Settings::Esp::chams_Color_VTT);
+							ImGui::PopItemWidth();
+
+
+						}
+					}
+					if (otherpages == 1)
+					{
+
+						const char* ThirdPerson[] =
+						{
+							"Classic",
+							"Real",
+							"Fake",
+						};
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+						ImGui::Checkbox("ThirdPerson", &Settings::Misc::misc_ThirdPerson);
+						ImGui::Combo("ThirdPerson Type", &Settings::Misc::ThirdPersonType, ThirdPerson, ARRAYSIZE(ThirdPerson));
+						ImGui::SliderInt("ThirdPerson Range", &Settings::Misc::misc_ThirdPersonRange, 1, 180);
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Text("Skybox Changer");
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("spoofs skybox to other map - buggy");
+						ImGui::Spacing();
 						if (ImGui::Combo("Skybox", &Settings::Misc::misc_CurrentSky, skybox_items, IM_ARRAYSIZE(skybox_items)))
 						{
 							Settings::Misc::misc_SkyName = skybox_items[Settings::Misc::misc_CurrentSky];
 						}
 
-						ImGui::Spacing();
 
-						ImGui::Text("Boost");
-						ImGui::Checkbox("Snow", &Settings::Misc::misc_Snow);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("Postprocess", &Settings::Misc::misc_EPostprocess);
+
+						ImGui::Checkbox("No Sky", &Settings::Misc::misc_NoSky);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("SMAC BAN - Removes Sky");
 						ImGui::SameLine(SpaceLineTwo);
-						ImGui::Checkbox("NoSky ", &Settings::Misc::misc_NoSky);
+
 
 						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
 
-						ImGui::Text("Bhop");
-						ImGui::Checkbox("Bhop", &Settings::Misc::misc_Bhop);
+						ImGui::Checkbox("Wire Smoke", &Settings::Misc::misc_wireframesmoke);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("SMAC BAN, buggy while walking through smoke");
 						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("AutoStrafe", &Settings::Misc::misc_AutoStrafe);
+						ImGui::Checkbox("No Smoke", &Settings::Misc::misc_NoSmoke);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("SMAC BAN, buggy while walking through smoke");
 						ImGui::SameLine(SpaceLineTwo);
-						ImGui::Checkbox("Spectators", &Settings::Misc::misc_Spectators);
+						ImGui::Checkbox("No Flash", &Settings::Misc::misc_NoFlash);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("disables rendering of flash blinding");
+
+
 
 						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
 
-						ImGui::Text("Other");
-						ImGui::Checkbox("SkeetBar", &Settings::Misc::SkeetBar);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("Blackout", &Settings::Misc::Blackout);
+						ImGui::Checkbox("Damage Indicator", &Settings::Esp::DamageIndicator);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Draws Damage Numbers next to enemy if hit - Disabled in Main Menu (crashfix)");
+						{
+							if (!Interfaces::Engine()->IsInGame())
+								Settings::Esp::DamageIndicator = false;
+						}
+
 						ImGui::SameLine(SpaceLineTwo);
-						ImGui::Checkbox("Anti-AFK", &Settings::Misc::misc_antiafk);
-						ImGui::Checkbox("LeftKnife", &Settings::Misc::misc_LeftHandKnife);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("RightKnife", &Settings::Misc::misc_RightHandKnife);
-						ImGui::SameLine(SpaceLineTwo);
-						ImGui::Checkbox("Fast Duck", &Settings::Misc::misc_Duck);
-
-
-					}ImGui::EndChild(); ImGui::SameLine();
-
-					ImGui::BeginChild("##Misc2", ImVec2(431, -1), true);
-					{
-						ImGui::Text("Crosshairs");
-						ImGui::Spacing();
-						ImGui::Checkbox("Punch", &Settings::Misc::misc_Punch);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("Recoil", &Settings::Misc::misc_Punch2);
-						ImGui::Checkbox("Sniper Dot", &Settings::Misc::misc_AwpAim);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::ColorEdit3("Dot Color", Settings::Misc::misc_AwpAimColor);
+						ImGui::PushItemWidth(300.f);
+						ImGui::ColorEdit3("Damager Color", Settings::Esp::DamagerColor);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Sets Color");
+						ImGui::PopItemWidth();
 
 						ImGui::Spacing();
-
-						ImGui::Text("Removes");
-						ImGui::Checkbox("NoFlash", &Settings::Misc::misc_NoFlash);
-						ImGui::SameLine(SpaceLineOne);
-						ImGui::Checkbox("NoSmoke", &Settings::Misc::misc_NoSmoke);
-
+						ImGui::Separator();
 						ImGui::Spacing();
 
-						ImGui::Text("HitMarker & Hitlog");
-						ImGui::Checkbox("Hit Log", &Settings::Esp::esp_hitevent);
+
+
 						ImGui::Checkbox("Hit Marker", &Settings::Misc::misc_HitMarker);
-						ImGui::SameLine(SpaceLineOne);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shows Crosshair when hit Enemy");
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::PushItemWidth(300.f);
 						ImGui::ColorEdit3("Hit Color", Settings::Misc::misc_HitMarkerColor);
-						ImGui::Combo("Sound", &Settings::Misc::misc_HitMarkerSound, iHitSound, ARRAYSIZE(iHitSound));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Hit Color");
+						ImGui::PopItemWidth();
+						ImGui::Combo("Hit Sound", &Settings::Misc::misc_HitMarkerSound, iHitSound, ARRAYSIZE(iHitSound));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Plays Sound on enemy hit");
 
 						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
 
-						ImGui::Text("BulletTracer");
-						ImGui::Checkbox("BulletTracer", &Settings::Esp::esp_beams_tracer);
-						ImGui::SameLine(SpaceLineOne);
+						ImGui::Checkbox("Beams Tracer", &Settings::Esp::esp_beams_tracer);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Draws Lines behind Bullets - Bullet Tracer - Disabled in Main Menu (crashfix)");
+						{
+							if (!Interfaces::Engine()->IsInGame())
+								Settings::Esp::esp_beams_tracer = false;
+						}
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::PushItemWidth(300.f);
 						ImGui::ColorEdit3("Tracer Color", Settings::Esp::flTracer_Beam);
-						ImGui::SliderFloat("Duration", &Settings::Esp::flTracersDuration, 0.f, 10.f, "%.2f");
-						ImGui::SliderFloat("Width", &Settings::Esp::flTracersWidth, 0.f, 10.f, "%.2f");
-
-					}ImGui::EndChild();
-			}
-
-			ImGui::End();
-		}
-
-		ImGui::SetNextWindowSize(ImVec2(410.f, 360.f));
-		if (ImGui::Begin("Configs", &bIsGuiVisible, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize))
-		{
-
-			if (Settings::Misc::SkeetBar)
-			{
-				static float flRainbow;
-				float flSpeed = 0.001;
-				int curWidth = 4;
-				ImVec2 curPos = ImGui::GetCursorPos();
-				ImVec2 curWindowPos = ImGui::GetWindowPos();
-				curPos.x += curWindowPos.x;
-				curPos.y += curWindowPos.y;
-				int size;
-				int y;
-				Interfaces::Engine()->GetScreenSize(y, size);
-				ImDrawRectRainbow(curPos.x - 10, curPos.y - 8, ImGui::GetWindowSize().x + size, curPos.y + -4, flSpeed, flRainbow);//10 5 4
-			}
-
-			static int iConfigSelect = 0;
-			static int iMenuSheme = 1;
-			static char ConfigName[64] = { 0 };
+						ImGui::PopItemWidth();
+						ImGui::SliderFloat("Duration", &Settings::Esp::flTracersDuration, 1.f, 10.f);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Sets Visible Time for Tracer");
+						ImGui::SliderFloat("Width", &Settings::Esp::flTracersWidth, 1.f, 10.f);
 
 
-			ImGui::PushItemWidth(386);
-			ImGui::ListBoxConfigArray("##Select", &iConfigSelect, ConfigList);
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Checkbox("Point Esp", &Settings::Radar::barrel);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Basically Out Of View ESP - Draws Points for Enemies");
 
 
-			if (ImGui::Button("Load Config", ImVec2(123, 0)))
-			{
-				Settings::LoadSettings("C:\\Champion\\" + ConfigList[iConfigSelect]);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Save Config", ImVec2(123, 0)))
-			{
-				if (iConfigSelect >= 0)
-					Settings::SaveSettings("C:\\Champion\\" + ConfigList[iConfigSelect]);
-				else
-					Settings::SaveSettings("C:\\Champion\\clearcfg.ini");
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Delete Config", ImVec2(123, 0)))
-			{
-				remove(string("C:\\Champion\\" + ConfigList[iConfigSelect]).c_str());
-				RefreshConfigs();
-			}
 
-			if (ImGui::Button("Refresh Config List", ImVec2(386, 0)))
-			{
-				RefreshConfigs();
-			}
 
-			ImGui::Separator();
+					}
 
-			ImGui::PushItemWidth(386);
-			ImGui::InputText("##Config Name", ConfigName, 64);
 
-			if (ImGui::Button("Create & Save new Config", ImVec2(386, 0)))
-			{
-				string ConfigFileName = ConfigName;
+					if (otherpages == 2)
+					{
+						g_pGui->bluefont();
+						;
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+						ImGui::Checkbox("Active", &Settings::Radar::rad_Active);
+						ImGui::SameLine();
+						ImGui::Checkbox("Team", &Settings::Radar::rad_Team);
+						ImGui::SameLine();
+						ImGui::Checkbox("Enemy", &Settings::Radar::rad_Enemy);
+						ImGui::SameLine();
+						ImGui::Checkbox("Barrel Radar", &Settings::Radar::barrel);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Basically Out Of View ESP - Draws Points for Enemies");
 
-				if (ConfigFileName.size() < 1)
-				{
-					ConfigFileName = "settings";
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::PushItemWidth(400.f);
+						ImGui::SliderInt("Range", &Settings::Radar::rad_Range, 1, 5000);
+						ImGui::SliderInt("Alpha", &Settings::Radar::rad_Alpha, 1, 255);
+						ImGui::PopItemWidth();
+
+						ImGui::Separator();
+						ImGui::Spacing();
+						ImGui::PushItemWidth(400.f);
+						ImGui::ColorEdit3("Radar CT", Settings::Radar::rad_Color_CT);
+
+						ImGui::ColorEdit3("Rad Visible CT", Settings::Radar::rad_Color_VCT);
+
+						ImGui::ColorEdit3("Radar T", Settings::Radar::rad_Color_TT);
+
+						ImGui::ColorEdit3("Rad Visible T", Settings::Radar::rad_Color_VTT);
+						ImGui::PopItemWidth();
+
+
+
+
+
+
+					}
+
+					ImGui::EndChild();
+					ImGui::EndGroup();
 				}
 
-				Settings::SaveSettings("C:\\Champion\\" + ConfigFileName + ".ini");
-				RefreshConfigs();
-			}
 
+
+
+				//----------------------------------------------------------------------------------------Changer-------------------------------------------------------------------------------------------------
+
+
+			}
+			else if (tabSelected == 3) // Skins
+			{
+
+
+				//[enc_string_disable /]
+
+				g_pGui->bluefont();
+				ImGui::BeginGroup();
+				ImGui::BeginChild(1, ImVec2(-1, 680), true);
+				{
+
+					ImGui::Text("Serverside Changers");
+					ImGui::Spacing();
+					ImGui::Checkbox("Profile Changer", &Settings::Misc::window_profilechanger);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Serversided - in lobby");
+					ImGui::Text("Rankchanger only works with a Rank and from lvl 3");
+
+
+					ImGui::Checkbox("Medal changer", &Settings::Misc::window_medalchanger);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("Serversided - in lobby AND in game");
+					ImGui::Text("Medalchanger only works from lvl 2");
+
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+					ImGui::Text("Clientsided Changers");
+					ImGui::Spacing();
+
+					ImGui::Checkbox("Skinchanger", &Settings::Misc::misc_SkinChanger);			
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("clientsided - you're the only one who can see those Skins");
+
+					ImGui::Checkbox("Inventory Changer", &Settings::Misc::window_inventorychanger);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("clientsided - you're the only one who can see it");
+
+
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+					ImGui::Text("Filters");
+					ImGui::Checkbox("Skin Ids", &Settings::Misc::skinids);
+					ImGui::SameLine(SpaceLineOne);
+					ImGui::Checkbox("Weapon Ids", &Settings::Misc::weaponids);
+					ImGui::SameLine(SpaceLineTwo);
+					ImGui::Checkbox("Medal Ids", &Settings::Misc::medalids);
+					ImGui::SameLine(SpaceLineThr);
+					ImGui::Checkbox("Sticker Ids", &Settings::Misc::stickerids);
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::Spacing();
+
+					ImGui::EndChild();
+					ImGui::EndGroup();
+				}
+				//------------------------------------------------------------------------------------------Misc---------------------------------------------------------------------------------------------------
+
+			}
+			else if (tabSelected == 4) // Misc
+			{
+				g_pGui->bluefont();
+				ImGui::BeginGroup();
+				ImGui::BeginChild(1, ImVec2(-1, 680), true);
+				{
+
+					ImGui::BeginGroup();
+
+					ImGui::Text("MISC");
+					ImGui::Separator();
+
+					static int otherpages = 0;
+
+
+
+					if (ImGui::Button("Misc 1", ImVec2(260.0f, 25.0f))) // <---- customize these to your liking.
+					{
+						otherpages = 0;
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Misc 2", ImVec2(260.0f, 25.0f))) // <---- again, customize to your liking.
+					{
+						otherpages = 1;
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Knifebot", ImVec2(260.0f, 25.0f))) // <---- again, customize to your liking.
+					{
+						otherpages = 2;
+					}
+
+					ImGui::Separator();
+
+					if (otherpages == 0)
+					{
+						ImGui::BeginGroup();
+
+						ImGui::Spacing();
+
+						/*	ImGui::Checkbox("rainbow menu", &Settings::Misc::misc_RainbowMenu);
+							if (ImGui::IsItemHovered())
+								ImGui::SetTooltip("does not work anymore on main window");
+							ImGui::PushItemWidth(362.f);
+							if (ImGui::InputFloat("fade speed", &Settings::Misc::misc_RainbowSpeed, 0.001f, 0.01f))
+							{
+								if (Settings::Misc::misc_RainbowSpeed < 0.001f)
+									Settings::Misc::misc_RainbowSpeed = 0.001f;
+								if (Settings::Misc::misc_RainbowSpeed > 0.01f)
+									Settings::Misc::misc_RainbowSpeed = 0.01f;
+							};
+							*/
+
+
+
+						ImGui::Hotkey("Menu Key", &Settings::menu_key, ImVec2(100, 25));
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("Anti Afk", &Settings::Misc::misc_AntiAfk);
+
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Checkbox("Bhop", &Settings::Misc::misc_Bhop);
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("Telehop", &Settings::Misc::misc_Telehop);
+						const char* strafe[] = { "none" , "legit" };
+						ImGui::Combo("Auto Strafe", &Settings::Misc::misc_AutoStrafe, strafe, IM_ARRAYSIZE(strafe));
+
+						ImGui::Checkbox("inventory always on", &Settings::Misc::invalwayson);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("allows you to access inventory in competitive match post-warmup");
+
+
+						ImGui::Checkbox("Sniper Crosshair", &Settings::Misc::misc_AwpAim);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Draws a Dot if you use a Sniper");
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("Random Chat Spam", &Settings::Misc::misc_spamrandom);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("trashtalks chat creatively");
+
+
+
+						ImGui::Checkbox("Chat Spam", &Settings::Misc::misc_spamregular);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Trashtalks Chat");
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("Spectators", &Settings::Misc::misc_Spectators);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Shows Spectators");
+
+
+
+
+						ImGui::Checkbox("Auto Accept", &Settings::Misc::misc_AutoAccept);
+						ImGui::SameLine(SpaceLineTwo);
+						ImGui::Checkbox("Kill Spam", &Settings::Misc::Killmessage);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("trashtalks after Killing someone");
+
+						ImGui::Checkbox("Radio Spam", &Settings::Misc::misc_radiospam);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("Spam Commands");
+
+
+
+						ImGui::Spacing();
+
+
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						string clan_1 = "none";
+						string clan_2 = "clear";
+						string clan_3 = "no-name";
+						string clan_4 = "riptide";
+						string clan_5 = "riptide no name";
+						string clan_6 = "valve";
+						string clan_7 = "valve no-name";
+						string clan_8 = "Baseult";
+						string clan_9 = "riptide animated";
+						const char* items5[] = { clan_1.c_str() , clan_2.c_str() , clan_3.c_str() , clan_4.c_str() , clan_5.c_str() , clan_6.c_str() , clan_7.c_str(), clan_8.c_str(), clan_9.c_str() };
+						ImGui::Combo("clantag changer", &Settings::Misc::misc_Clan, items5, IM_ARRAYSIZE(items5));
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("buggy - lagging sometimes - changes your clantag");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+						ImGui::Checkbox("Fov Changer", &Settings::Misc::misc_FovChanger);
+						ImGui::PushItemWidth(362.f);
+						ImGui::SliderInt("Fov View", &Settings::Misc::misc_FovView, 1, 190);
+						ImGui::SliderInt("Fov Model View", &Settings::Misc::misc_FovModelView, 1, 190);
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Text("Riptide Coded by Baseult, Swifty, Mitch, Vsonyp0wer, Karmafreediet, Undetected");
+						ImGui::Text("Official Website: riptide.tk");
+
+						ImGui::EndGroup();
+					}
+					if (otherpages == 1)
+					{
+
+						ImGui::BeginGroup();
+
+						ImGui::Spacing();
+
+
+						static char buf2[128] = { 0 };
+						ImGui::Text("Custom Name");
+						ImGui::InputText("##CustomName", buf2, 16, Settings::Misc::misc_NameChange);
+						if (ImGui::Button("apply custom name")) {
+							ConVar* Name = Interfaces::GetConVar()->FindVar("name");
+							*(int*)((DWORD)&Name->fnChangeCallback + 0xC) = 0;
+							Name->SetValue(buf2);
+						}
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+
+						static char misc_CustomClanTag[128] = { 0 };
+						ImGui::Text("Custom Clantag");
+						ImGui::InputText("##CustomClanTag", misc_CustomClanTag, 128);
+
+						if (ImGui::Button("apply custom clantag"))
+						{
+							Engine::ClanTagApply(misc_CustomClanTag);
+						}
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						ImGui::Checkbox("Gravity", &Settings::Misc::misc_ragdoll_gravity);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("changes gravity for corpse, buggy, SMAC BAN");
+						ImGui::SliderInt("Gravity Amount", &Settings::Misc::misc_ragdoll_gravity_amount, -1000, 1000);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("0 = no gravity / 1000 = high gravity / -1000 = negative gravity");
+
+						ImGui::Checkbox("Pushscale", &Settings::Misc::misc_pushscale);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("spoofs phys_pushscale, possibly untrusted, SMAC BAN");
+						ImGui::SliderInt("Pushscale Amount", &Settings::Misc::misc_pushscale_amount, 0, 5000);
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("buggy");
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+						if (ImGui::Button("Ayyware Crasher"))    //Crashes the Ayyware ESP. Most of ayyware user already fixed it.
+						{
+
+							ConVar* Name = Interfaces::GetConVar()->FindVar("name");
+							*(int*)((DWORD)&Name->fnChangeCallback + 0xC) = 0;
+
+							Name->SetValue("GETCRASHEDAYY?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????");
+						}
+						if (ImGui::IsItemHovered())
+							ImGui::SetTooltip("changes your name to crash ayyware name esp/spectators list");
+
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+
+
+
+
+
+					}
+
+					if (otherpages == 2)
+					{
+
+						ImGui::BeginGroup();
+						ImGui::Spacing();
+
+						ImGui::Checkbox("Active", &Settings::Knifebot::knf_Active);
+						ImGui::Checkbox("Attack Team", &Settings::Knifebot::knf_Team);
+
+						ImGui::Separator();
+
+						string attack_1 = "attack 1";
+						string attack_2 = "attack 2";
+						string attack_3 = "both";
+
+						const char* items[] = { attack_1.c_str() , attack_2.c_str() , attack_3.c_str() };
+						ImGui::Combo("Attack Type", &Settings::Knifebot::knf_Attack, items, IM_ARRAYSIZE(items));
+
+						ImGui::Separator();
+
+						ImGui::SliderInt("Distance to Attack 1", &Settings::Knifebot::knf_DistAttack, 1, 100);
+						ImGui::SliderInt("Distance to Attack 2", &Settings::Knifebot::knf_DistAttack2, 1, 100);
+
+						ImGui::EndGroup();
+
+					}
+					ImGui::EndChild();
+					ImGui::EndGroup();
+				}
+
+			}
+			ImGui::EndGroup();
 			ImGui::End();
+
 		}
 	}
 }
+
+
+
+
+
+

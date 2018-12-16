@@ -2,41 +2,85 @@
 #include "../../Engine/Render.h"
 #include "../../SDK/beambullets.h"
 #include "../../SDK/BeamsInclude.h"
-#include "../GranadeHelper/CGrenadeAPI.h"
-#include "../../Engine/EventLogs.h"
+#include "../../Cheat/GrenadeHelper/CGrenadeAPI.h"
 std::vector<cbullet_tracer_info> logs;
-
-SDK::PlayerInfo GetInfo(int Index)
-{
-	SDK::PlayerInfo info;
-	Interfaces::Engine()->GetPlayerInfo(Index, &info);
-	return info;
-}
-
-char* HitgroupToName(int hitgroup)
-{
-	switch (hitgroup)
-	{
-	case HITGROUP_HEAD:
-		return "head";
-	case HITGROUP_LEFTLEG:
-		return "leg";
-	case HITGROUP_RIGHTLEG:
-		return "leg";
-	case HITGROUP_LEFTARM:
-		return "arm";
-	case HITGROUP_RIGHTARM:
-		return "arm";
-	case HITGROUP_STOMACH:
-		return "chest";
-	default:
-		return "chest";
-	}
-}
-
+std::vector<DamageIndicator_t> DamageIndicator;
+#define DEG2RAD1( x  )  ( (float)(x) * (float)(M_PI_F / 180.f) )
 using namespace Client;
 //[enc_string_enable /]
 //[junk_enable /]
+CSoundEsp::CSoundEsp()
+{
+	SoundColor = Color::White();
+}
+
+void CSoundEsp::Update()
+{
+	for (size_t i = 0; i < Sound.size(); i++)
+	{
+		if (Sound[i].dwTime + 800 <= GetTickCount64())
+		{
+			Sound.erase(Sound.begin() + i);
+		}
+	}
+}
+
+void CSoundEsp::AddSound(Vector vOrigin)
+{
+	Sound_s Sound_Entry;
+
+	Sound_Entry.dwTime = GetTickCount64();
+	Sound_Entry.vOrigin = vOrigin;
+
+	Sound.push_back(Sound_Entry);
+}
+
+void CSoundEsp::DrawSoundEsp()
+{
+	for (size_t i = 0; i < Sound.size(); i++)
+	{
+		Vector vScreen;
+
+		Color SoundVisuals_Color = Color(int(Settings::Esp::SoundVisuals_Color[0] * 255.f),
+			int(Settings::Esp::SoundVisuals_Color[1] * 255.f),
+			int(Settings::Esp::SoundVisuals_Color[2] * 255.f));
+
+		CBaseEntity* localplayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+		CPlayer* pPlayer;
+
+		if (WorldToScreen(Sound[i].vOrigin, vScreen))
+		{
+			if (Settings::Esp::esp_Sound)
+				g_pRender->DrawCircle3D(Sound[i].vOrigin, 13, 13, SoundVisuals_Color);
+		}
+	}
+}
+
+void CSoundEsp::DrawWave(Vector loc, float radius, Color color)
+{
+	static float Step = M_PI * 3.0f / 40;
+	Vector prev;
+	for (float lat = 0; lat <= M_PI * 3.0f; lat += Step)
+	{
+		float sin1 = sin(lat);
+		float cos1 = cos(lat);
+		float sin3 = sin(0.0);
+		float cos3 = cos(0.0);
+
+		Vector point1;
+		point1 = Vector(sin1 * cos3, cos1, sin1 * sin3) * radius;
+		Vector point3 = loc;
+		Vector Out;
+		point3 += point1;
+
+		if (WorldToScreen(point3, Out))
+		{
+			if (lat > 0.000)
+				g_pRender->DrawLine(prev.x, prev.y, Out.x, Out.y, color);
+		}
+		prev = Out;
+	}
+}
 
 CEsp::CEsp()
 {
@@ -57,6 +101,42 @@ CEsp::CEsp()
 
 	fExplodeC4Timer = 0.f;
 	fC4Timer = 0.f;
+}
+
+void CEsp::DrawDamageIndicator()
+{
+	CBaseEntity* pLocal = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+	float CurrentTime = pLocal->GetTickBase() * Interfaces::GlobalVars()->interval_per_tick;
+
+	for (int i = 0; i < DamageIndicator.size(); i++)
+	{
+		if (DamageIndicator[i].flEraseTime < CurrentTime)
+		{
+			DamageIndicator.erase(DamageIndicator.begin() + i);
+			continue;
+		}
+
+		if (!DamageIndicator[i].bInitialized)
+		{
+			DamageIndicator[i].Position = DamageIndicator[i].Player->GetBonePosition(HITBOX_HEAD);
+			DamageIndicator[i].bInitialized = true;
+		}
+
+		if (CurrentTime - DamageIndicator[i].flLastUpdate > 0.0001f)
+		{
+			DamageIndicator[i].Position.z -= (0.6f * (CurrentTime - DamageIndicator[i].flEraseTime));
+			DamageIndicator[i].flLastUpdate = CurrentTime;
+		}
+
+		Vector ScreenPosition;
+
+		if (WorldToScreen(DamageIndicator[i].Position, ScreenPosition))
+		{
+			g_pRender->Text(ScreenPosition.x, ScreenPosition.y, false, true, Color(int(Settings::Esp::DamagerColor[0] * 255.f),
+				int(Settings::Esp::DamagerColor[1] * 255.f),
+				int(Settings::Esp::DamagerColor[2] * 255.f)), std::to_string(DamageIndicator[i].iDamage).c_str());
+		}
+	}
 }
 
 Color CEsp::GetPlayerColor(CPlayer* pPlayer)
@@ -182,40 +262,14 @@ void CEsp::Ambient()
 	}
 }
 
-void CEsp::HitEvents(IGameEvent* event)
-{
-	if (!Settings::Esp::esp_hitevent)
-		return;
-
-	if (!strcmp(event->GetName(), "player_hurt"))
-	{
-		int attackerid = event->GetInt("attacker");
-		int entityid = Interfaces::Engine()->GetPlayerForUserID(attackerid);
-		if (entityid == Interfaces::Engine()->GetLocalPlayer())
-		{
-			int nUserID = event->GetInt("attacker");
-			int nDead = event->GetInt("userid");
-			if (nUserID || nDead)
-			{
-				SDK::PlayerInfo killed_info = GetInfo(Interfaces::Engine()->GetPlayerForUserID(nDead));
-				EventLog->AddToLog("Damaged %s in the %s for %i damage (%i health left)",
-					killed_info.m_szPlayerName,
-					HitgroupToName(event->GetInt("hitgroup")),
-					event->GetInt("dmg_health"),
-					event->GetInt("health"));
-			}
-		}
-	}
-}
-
-bool nightz = false;
+bool done = false;
 void CEsp::NightMode()
 {
 	if (Interfaces::Engine()->IsInGame() && Interfaces::Engine()->IsConnected())
 	{
 		if (Settings::Esp::esp_NightMode)
 		{
-			if (!nightz)
+			if (!done)
 			{
 				static auto sv_skyname = Interfaces::GetConVar()->FindVar("sv_skyname");
 				static auto r_DrawSpecificStaticProp = Interfaces::GetConVar()->FindVar("r_DrawSpecificStaticProp");
@@ -231,6 +285,11 @@ void CEsp::NightMode()
 
 					const char* group = pMaterial->GetTextureGroupName();
 					const char* name = pMaterial->GetName();
+
+
+					double XD = 100;
+					double Opacity = int(Settings::Esp::esp_WallsOpacity);
+					double RealOpacity = Opacity / XD;
 
 					if (strstr(group, "World textures"))
 					{
@@ -253,7 +312,7 @@ void CEsp::NightMode()
 					{
 						pMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
 					}
-					nightz = true;
+					done = true;
 				}
 
 			}
@@ -261,7 +320,7 @@ void CEsp::NightMode()
 		}
 		else
 		{
-			if (nightz)
+			if (done)
 			{
 				for (MaterialHandle_t i = Interfaces::MaterialSystem()->FirstMaterial(); i != Interfaces::MaterialSystem()->InvalidMaterial(); i = Interfaces::MaterialSystem()->NextMaterial(i))
 				{
@@ -298,15 +357,263 @@ void CEsp::NightMode()
 					}
 				}
 
-				nightz = false;
+				done = false;
 			}
 		}
 	}
 }
 
+void AngleVectors3(const Vector &angles, Vector *forward)
+{
+	Assert(s_bMathlibInitialized);
+	Assert(forward);
+
+	float	sp, sy, cp, cy;
+
+	sy = sin(DEG2RAD(angles[1]));
+	cy = cos(DEG2RAD(angles[1]));
+
+	sp = sin(DEG2RAD(angles[0]));
+	cp = cos(DEG2RAD(angles[0]));
+
+	forward->x = cp * cy;
+	forward->y = cp * sy;
+	forward->z = -sp;
+}
+
+
+int StringToWeapon(std::string weapon) {
+	if (!strcmp(weapon.c_str(), "smokegrenade"))
+		return 45;
+	if (!strcmp(weapon.c_str(), "flashbang"))
+		return 43;
+	if (!strcmp(weapon.c_str(), "incgrenade"))
+		return 46;
+}
+
+void CEsp::GrenadePrediction()
+{
+
+		//CBaseEntity* local = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+		//Color Color1 = Color::Red();
+
+		//const float TIMEALIVE = 5.f;
+		//const float GRENADE_COEFFICIENT_OF_RESTITUTION = 0.4f;
+
+		//float fStep = 0.1f;
+		//float fGravity = 800.0f / 8.f;
+
+		//Vector vPos, vThrow, vThrow2;
+		//Vector vStart;
+
+		//int iCollisions = 0;
+
+		//QAngle vViewAngles;
+		//Interfaces::Engine()->GetViewAngles(vViewAngles);
+
+		//vThrow[0] = vViewAngles[0];
+		//vThrow[1] = vViewAngles[1];
+		//vThrow[2] = vViewAngles[2];
+
+		//if (vThrow[0] < 0)
+		//{
+		//	vThrow[0] = -10 + vThrow[0] * ((90 - 10) / 90.0);
+		//}
+
+		//else
+		//{
+		//	vThrow[0] = -10 + vThrow[0] * ((90 + 10) / 90.0);
+		//}
+
+		//float fVel = (90 - vThrow[0]) * 4;
+		//if (fVel > 500)
+		//	fVel = 500;
+
+		//AngleVectors3(vThrow, &vThrow2);
+
+		//Vector vEye = local->GetEyePosition();
+		//vStart[0] = vEye[0] + vThrow2[0] * 16;
+		//vStart[1] = vEye[1] + vThrow2[1] * 16;
+		//vStart[2] = vEye[2] + vThrow2[2] * 16;
+
+		//vThrow2[0] = (vThrow2[0] * fVel) + local->GetVelocity()[0];
+		//vThrow2[1] = (vThrow2[1] * fVel) + local->GetVelocity()[1];
+		//vThrow2[2] = (vThrow2[2] * fVel) + local->GetVelocity()[2];
+
+		//for (float fTime = 0.0f; fTime < TIMEALIVE; fTime += fStep)
+		//{
+		//	vPos = vStart + vThrow2 * fStep;
+
+		//	Ray_t ray;
+		//	trace_t tr;
+		//	CTraceFilter loc;
+		//	loc.pSkip = local;
+
+		//	ray.Init(vStart, vPos);
+		//	Interfaces::EngineTrace()->TraceRay(ray, MASK_SOLID, &loc, &tr);
+
+		//	if (tr.DidHit())
+		//	{
+		//		float anglez = DotProduct(Vector(0, 0, 1), tr.plane.normal);
+		//		float invanglez = DotProduct(Vector(0, 0, -1), tr.plane.normal);
+		//		float angley = DotProduct(Vector(0, 1, 0), tr.plane.normal);
+		//		float invangley = DotProduct(Vector(0, -1, 0), tr.plane.normal);
+		//		float anglex = DotProduct(Vector(1, 0, 0), tr.plane.normal);
+		//		float invanglex = DotProduct(Vector(-1, 0, 0), tr.plane.normal);
+		//		float scale = tr.endpos.DistTo(local->GetOrigin()) / 60;
+
+		//		Color color = Color(0, 0, 0, 0);
+
+		//		if (anglez > 0.5)
+		//		{
+		//			tr.endpos.z += 1;
+		//			Vector startPos = tr.endpos + Vector(-scale, 0, 0);
+		//			Vector endPos = tr.endpos + Vector(scale, 0, 0);
+		//			Vector outStart, outEnd;
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+
+		//			startPos = tr.endpos + Vector(0, -scale, 0);
+		//			endPos = tr.endpos + Vector(0, scale, 0);
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+		//		}
+		//		else if (invanglez > 0.5)
+		//		{
+		//			tr.endpos.z += 1;
+		//			Vector startPos = tr.endpos + Vector(-scale, 0, 0);
+		//			Vector endPos = tr.endpos + Vector(scale, 0, 0);
+		//			Vector outStart, outEnd;
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+
+		//			startPos = tr.endpos + Vector(0, -scale, 0);
+		//			endPos = tr.endpos + Vector(0, scale, 0);
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+		//		}
+		//		else if (angley > 0.5)
+		//		{
+		//			tr.endpos.y += 1;
+		//			Vector startPos = tr.endpos + Vector(0, 0, -scale);
+		//			Vector endPos = tr.endpos + Vector(0, 0, scale);
+		//			Vector outStart, outEnd;
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+
+		//			startPos = tr.endpos + Vector(-scale, 0, 0);
+		//			endPos = tr.endpos + Vector(scale, 0, 0);
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+		//		}
+		//		else if (invangley > 0.5)
+		//		{
+		//			tr.endpos.y += 1;
+		//			Vector startPos = tr.endpos + Vector(0, 0, -scale);
+		//			Vector endPos = tr.endpos + Vector(0, 0, scale);
+		//			Vector outStart, outEnd;
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+
+		//			startPos = tr.endpos + Vector(-scale, 0, 0);
+		//			endPos = tr.endpos + Vector(scale, 0, 0);
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+		//		}
+		//		else if (anglex > 0.5)
+		//		{
+		//			tr.endpos.x += 1;
+		//			Vector startPos = tr.endpos + Vector(0, -scale, 0);
+		//			Vector endPos = tr.endpos + Vector(0, scale, 0);
+		//			Vector outStart, outEnd;
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+
+		//			startPos = tr.endpos + Vector(0, 0, -scale);
+		//			endPos = tr.endpos + Vector(0, 0, scale);
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+		//		}
+		//		else if (invanglex > 0.5)
+		//		{
+		//			tr.endpos.x += 1;
+		//			Vector startPos = tr.endpos + Vector(0, -scale, 0);
+		//			Vector endPos = tr.endpos + Vector(0, scale, 0);
+		//			Vector outStart, outEnd;
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+
+		//			startPos = tr.endpos + Vector(0, 0, -scale);
+		//			endPos = tr.endpos + Vector(0, 0, scale);
+
+		//			if (WorldToScreen(startPos, outStart) && WorldToScreen(endPos, outEnd))
+		//			{
+		//				g_pRender->DrawLine(outStart.x, outStart.y, outEnd.x, outEnd.y, color);
+		//			}
+		//		}
+
+		//		vThrow2 = tr.plane.normal * -2.0f * DotProduct(vThrow2, tr.plane.normal) + vThrow2;
+		//		vThrow2 *= GRENADE_COEFFICIENT_OF_RESTITUTION;
+
+		//		iCollisions++;
+		//		if (iCollisions > 2)
+		//			break;
+
+		//		vPos = vStart + vThrow2 * tr.fraction * fStep;
+		//		fTime += (fStep * (1 - tr.fraction));
+		//	}
+
+		//	Vector vOutStart, vOutEnd;
+
+		//	if (WorldToScreen(vStart, vOutStart), WorldToScreen(vPos, vOutEnd))
+		//	{
+		//		g_pRender->DrawLine(vOutStart.x, vOutStart.y, vOutEnd.x, vOutEnd.y, Color1);
+		//	}
+
+		//	vStart = vPos;
+		//	vThrow2.z -= fGravity * tr.fraction * fStep;
+		//}
+	
+}
 
 void CEsp::HitmarkerEvents(IGameEvent* event)
 {
+	//if (!Settings::Misc::misc_HitMarker)
+	//	return;
+
 	if (Settings::Misc::misc_HitMarker & !strcmp(event->GetName(), "player_hurt"))
 	{
 		int attacker = event->GetInt("attacker");
@@ -317,7 +624,6 @@ void CEsp::HitmarkerEvents(IGameEvent* event)
 			case 1: PlaySoundA(rawData, NULL, SND_ASYNC | SND_MEMORY); break;
 			case 2: PlaySoundA(pew, NULL, SND_ASYNC | SND_MEMORY); break;
 			case 3: PlaySoundA(roblox, NULL, SND_ASYNC | SND_MEMORY); break;
-			case 4: PlaySoundA(skeethitmarker_wav, NULL, SND_ASYNC | SND_MEMORY); break;
 			case 5: PlaySoundA(hitler_wav, NULL, SND_ASYNC | SND_MEMORY); break;
 			case 6: PlaySoundA(headmeme, NULL, SND_ASYNC | SND_MEMORY); break;
 			case 7: PlaySoundA(FadeCSGO, NULL, SND_ASYNC | SND_MEMORY); break;
@@ -325,83 +631,76 @@ void CEsp::HitmarkerEvents(IGameEvent* event)
 			Settings::hitmarkerAlpha = 1.f;
 		}
 	}
-
-	if (Interfaces::Engine()->IsInGame() && Interfaces::Engine()->IsConnected())
+	if (Settings::Esp::esp_beams_tracer & !strcmp(event->GetName(), "bullet_impact"))
 	{
-		if (Settings::Esp::esp_beams_tracer & !strcmp(event->GetName(), "bullet_impact"))
+		CBaseEntity* LocalPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+
+		if (LocalPlayer)
 		{
-			CBaseEntity* LocalPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+			auto index = Interfaces::Engine()->GetPlayerForUserID(event->GetInt("userid"));
 
-			if (LocalPlayer)
+			if (index != Interfaces::Engine()->GetLocalPlayer())
+				return;
+
+			auto local = static_cast<CBaseEntity*>(Interfaces::EntityList()->GetClientEntity(index));
+
+			Vector position(event->GetFloat("x"), event->GetFloat("y"), event->GetFloat("z"));
+
+			Ray_t ray;
+
+			ray.Init(local->GetEyePosition(), position);
+
+			CTraceFilter filter;
+
+			filter.pSkip = local;
+
+			trace_t tr;
+			Interfaces::EngineTrace()->TraceRay(ray, MASK_SHOT, &filter, &tr);
+
+			logs.push_back(cbullet_tracer_info(local->GetEyePosition(), position, Interfaces::GlobalVars()->curtime, Color(255, 255, 255, 255)));
+
+			if (!local)
+				return;
+
+			for (size_t i = 0; i < logs.size(); i++)
 			{
-				auto index = Interfaces::Engine()->GetPlayerForUserID(event->GetInt("userid"));
+				auto current = logs.at(i);
+				current.color = Color(int(Settings::Esp::flTracer_Beam[0] * 255.f), int(Settings::Esp::flTracer_Beam[1] * 255.f), int(Settings::Esp::flTracer_Beam[2] * 255.f)); //color of local player's tracers
+				BeamInfo_t beamInfo;
+				beamInfo.m_nType = TE_BEAMPOINTS;
+				beamInfo.m_pszModelName = "sprites/physbeam.vmt";
+				beamInfo.m_nModelIndex = -1;
+				beamInfo.m_flHaloScale = 0.0f;
+				beamInfo.m_flLife = Settings::Esp::flTracersDuration;
+				beamInfo.m_flWidth = Settings::Esp::flTracersWidth;
+				beamInfo.m_flEndWidth = Settings::Esp::flTracersWidth;
+				beamInfo.m_flFadeLength = 0.0f;
+				beamInfo.m_flAmplitude = 2.0f;
+				beamInfo.m_flBrightness = 255.f;
+				beamInfo.m_flSpeed = 0.2f;
+				beamInfo.m_nStartFrame = 0;
+				beamInfo.m_flFrameRate = 0.f;
+				beamInfo.m_flRed = current.color.r();
+				beamInfo.m_flGreen = current.color.g();
+				beamInfo.m_flBlue = current.color.b();
+				beamInfo.m_nSegments = 2;
+				beamInfo.m_bRenderable = true;
+				beamInfo.m_nFlags = FBEAM_ONLYNOISEONCE | FBEAM_NOTILE | FBEAM_HALOBEAM;
 
-				if (index != Interfaces::Engine()->GetLocalPlayer())
-					return;
-
-				auto local = static_cast<CBaseEntity*>(Interfaces::EntityList()->GetClientEntity(index));
-
-				Vector position(event->GetFloat("x"), event->GetFloat("y"), event->GetFloat("z"));
-
-				Ray_t ray;
-
-				ray.Init(local->GetEyePosition(), position);
-
-				CTraceFilter filter;
-
-				filter.pSkip = local;
-
-				trace_t tr;
-				Interfaces::EngineTrace()->TraceRay(ray, MASK_SHOT, &filter, &tr);
-
-				logs.push_back(cbullet_tracer_info(local->GetEyePosition(), position, Interfaces::GlobalVars()->curtime, Color(255, 255, 255, 255)));
-
-				if (!local)
-					return;
-
-				for (size_t i = 0; i < logs.size(); i++)
+				beamInfo.m_vecStart = LocalPlayer->GetEyePosition();
+				beamInfo.m_vecEnd = current.dst;
+				if (Settings::Esp::esp_beams_tracer)
 				{
-					auto current = logs.at(i);
 
-					current.color = Color(int(Settings::Esp::flTracer_Beam[0] * 255.f),
-						int(Settings::Esp::flTracer_Beam[1] * 255.f),
-						int(Settings::Esp::flTracer_Beam[2] * 255.f)); //color of local player's tracers
-					BeamInfo_t beamInfo;
-					beamInfo.m_nType = TE_BEAMPOINTS;
-					beamInfo.m_pszModelName = "sprites/physbeam.vmt";
-					beamInfo.m_nModelIndex = -1;
-					beamInfo.m_flHaloScale = 0.0f;
-					beamInfo.m_flLife = Settings::Esp::flTracersDuration;
-					beamInfo.m_flWidth = Settings::Esp::flTracersWidth;
-					beamInfo.m_flEndWidth = Settings::Esp::flTracersWidth;
-					beamInfo.m_flFadeLength = 0.0f;
-					beamInfo.m_flAmplitude = 2.0f;
-					beamInfo.m_flBrightness = 255.f;
-					beamInfo.m_flSpeed = 0.2f;
-					beamInfo.m_nStartFrame = 0;
-					beamInfo.m_flFrameRate = 0.f;
-					beamInfo.m_flRed = current.color.r();
-					beamInfo.m_flGreen = current.color.g();
-					beamInfo.m_flBlue = current.color.b();
-					beamInfo.m_nSegments = 2;
-					beamInfo.m_bRenderable = true;
-					beamInfo.m_nFlags = FBEAM_ONLYNOISEONCE | FBEAM_NOTILE | FBEAM_HALOBEAM;
-
-					beamInfo.m_vecStart = LocalPlayer->GetEyePosition();
-					beamInfo.m_vecEnd = current.dst;
-					if (Settings::Esp::esp_beams_tracer)
-					{
-
-						auto beam = shit::g_pViewRenderBeams()->CreateBeamPoints(beamInfo);
-						if (beam)
-							shit::g_pViewRenderBeams()->DrawBeam(beam);
-					}
-
-					logs.erase(logs.begin() + i);
+					auto beam = shit::g_pViewRenderBeams()->CreateBeamPoints(beamInfo);
+					if (beam)
+						shit::g_pViewRenderBeams()->DrawBeam(beam);
 				}
 
-
+				logs.erase(logs.begin() + i);
 			}
+
+
 		}
 	}
 }
@@ -421,9 +720,7 @@ void CEsp::renderBeams()
 
 		auto current = logs.at(i);
 
-		current.color = Color(int(Settings::Esp::flTracer_Beam[0] * 255.f),
-			int(Settings::Esp::flTracer_Beam[1] * 255.f),
-			int(Settings::Esp::flTracer_Beam[2] * 255.f));
+		current.color = Color(int(Settings::Esp::flTracer_Beam[0] * 255.f), int(Settings::Esp::flTracer_Beam[1] * 255.f), int(Settings::Esp::flTracer_Beam[2] * 255.f));
 
 		if (Settings::Esp::esp_beams_tracer)
 			Interfaces::DebugOverlay()->AddLineOverlay(current.src, current.dst, current.color.r(), current.color.g(), current.color.g(), true, -1.f);
@@ -434,15 +731,6 @@ void CEsp::renderBeams()
 		if (fabs(Interfaces::GlobalVars()->curtime - current.time) > 5.f)
 			logs.erase(logs.begin() + i);
 	}
-}
-
-int StringToWeapon(std::string weapon) {
-	if (!strcmp(weapon.c_str(), "smokegrenade"))
-		return 45;
-	if (!strcmp(weapon.c_str(), "flashbang"))
-		return 43;
-	if (!strcmp(weapon.c_str(), "incgrenade"))
-		return 46;
 }
 
 void CEsp::DrawHitmarker()
@@ -461,10 +749,10 @@ void CEsp::DrawHitmarker()
 
 	if (Settings::hitmarkerAlpha > 0.f)
 	{
-		g_pRender->DrawLine(W / 2 - 10, H / 2 - 10, W / 2 - 5, H / 2 - 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
-		g_pRender->DrawLine(W / 2 - 10, H / 2 + 10, W / 2 - 5, H / 2 + 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
-		g_pRender->DrawLine(W / 2 + 10, H / 2 - 10, W / 2 + 5, H / 2 - 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
-		g_pRender->DrawLine(W / 2 + 10, H / 2 + 10, W / 2 + 5, H / 2 + 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
+		g_pRender->DrawLine(W / 2 - 15, H / 2 - 15, W / 2 - 5, H / 2 - 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
+		g_pRender->DrawLine(W / 2 - 15, H / 2 + 15, W / 2 - 5, H / 2 + 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
+		g_pRender->DrawLine(W / 2 + 15, H / 2 - 15, W / 2 + 5, H / 2 - 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
+		g_pRender->DrawLine(W / 2 + 15, H / 2 + 15, W / 2 + 5, H / 2 + 5, Color(r, g, b, (Settings::hitmarkerAlpha * 255.f)));
 	}
 }
 
@@ -486,7 +774,6 @@ void hitmarker::player_hurt_listener::stop()
 void hitmarker::player_hurt_listener::FireGameEvent(IGameEvent *event)
 {
 	g_pEsp->HitmarkerEvents(event);
-	g_pEsp->HitEvents(event);
 }
 int hitmarker::player_hurt_listener::GetEventDebugID(void)
 {
@@ -495,6 +782,10 @@ int hitmarker::player_hurt_listener::GetEventDebugID(void)
 
 void CEsp::OnRender()
 {
+	CBaseEntity* LocalPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+
+	if (Settings::Esp::esp_Sound)
+		SoundEsp.DrawSoundEsp();
 
 	if (g_pAimbot)
 		g_pAimbot->OnRender();
@@ -502,9 +793,17 @@ void CEsp::OnRender()
 	if (Settings::Misc::misc_HitMarker)
 		DrawHitmarker();
 
-	renderBeams();
+	if (Settings::Esp::DamageIndicator)
+		DrawDamageIndicator();
+
+	/*if (Settings::Esp::esp_GrenadePrediction && LocalPlayer->GetWeapon()->IsGrenade() && LocalPlayer->GetAlive())
+		GrenadePrediction();*/
+
 
 	Ambient();
+
+	renderBeams();
+	AsusWalls();
 
 	if (Settings::Misc::misc_AwpAim && IsLocalAlive() && g_pPlayers->GetLocal()->WeaponIndex == WEAPON_AWP)
 	{
@@ -512,7 +811,7 @@ void CEsp::OnRender()
 			int(Settings::Misc::misc_AwpAimColor[1] * 255.f),
 			int(Settings::Misc::misc_AwpAimColor[2] * 255.f));
 
-		g_pRender->DrawOutlineBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
+		g_pRender->DrawFillBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
 	}
 	if (Settings::Misc::misc_AwpAim && IsLocalAlive() && g_pPlayers->GetLocal()->WeaponIndex == WEAPON_SCAR20)
 	{
@@ -520,7 +819,7 @@ void CEsp::OnRender()
 			int(Settings::Misc::misc_AwpAimColor[1] * 255.f),
 			int(Settings::Misc::misc_AwpAimColor[2] * 255.f));
 
-		g_pRender->DrawOutlineBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
+		g_pRender->DrawFillBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
 	}
 	if (Settings::Misc::misc_AwpAim && IsLocalAlive() && g_pPlayers->GetLocal()->WeaponIndex == WEAPON_SSG08)
 	{
@@ -528,7 +827,7 @@ void CEsp::OnRender()
 			int(Settings::Misc::misc_AwpAimColor[1] * 255.f),
 			int(Settings::Misc::misc_AwpAimColor[2] * 255.f));
 
-		g_pRender->DrawOutlineBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
+		g_pRender->DrawFillBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
 	}
 	if (Settings::Misc::misc_AwpAim && IsLocalAlive() && g_pPlayers->GetLocal()->WeaponIndex == WEAPON_G3SG1)
 	{
@@ -536,15 +835,8 @@ void CEsp::OnRender()
 			int(Settings::Misc::misc_AwpAimColor[1] * 255.f),
 			int(Settings::Misc::misc_AwpAimColor[2] * 255.f));
 
-		g_pRender->DrawOutlineBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
+		g_pRender->DrawFillBox(iScreenWidth / 2 - 1, iScreenHeight / 2 - 1, 3, 3, AwpAimColor);
 	}
-
-	IMaterial *xblur_mat = Interfaces::MaterialSystem()->FindMaterial("dev/blurfilterx_nohdr", TEXTURE_GROUP_OTHER, true);
-	IMaterial *yblur_mat = Interfaces::MaterialSystem()->FindMaterial("dev/blurfiltery_nohdr", TEXTURE_GROUP_OTHER, true);
-	IMaterial *scope = Interfaces::MaterialSystem()->FindMaterial("dev/scope_bluroverlay", TEXTURE_GROUP_OTHER, true);
-	xblur_mat->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
-	yblur_mat->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
-	scope->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
 
 	NightMode();
 
@@ -554,13 +846,11 @@ void CEsp::OnRender()
 
 		if (pPlayer && pPlayer->m_pEntity && pPlayer->bUpdate && CheckPlayerTeam(pPlayer))
 		{
+  
 			DrawPlayerEsp(pPlayer);
 
 			if (Settings::Esp::esp_Skeleton)
 				DrawPlayerSkeleton(pPlayer);
-
-			if (Settings::Esp::esp_BulletTrace)
-				DrawPlayerBulletTrace(pPlayer);
 
 			if (Settings::Esp::esp_Dlightz)
 				Dlight(pPlayer);
@@ -589,72 +879,76 @@ void CEsp::OnRender()
 		{
 			fExplodeC4Timer = 0.f;
 			fC4Timer = 0.f;
-
-			Color GrenadeHelper = Color(int(Settings::Esp::GrenadeHelper[0] * 255.f),
-				int(Settings::Esp::GrenadeHelper[1] * 255.f),
-				int(Settings::Esp::GrenadeHelper[2] * 255.f));
-
-			if (Settings::Esp::helper)
-			{
-				CBaseEntity* local = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
-
-				for (int i = 0; i < cGrenade.GrenadeInfo.size(); i++)
-				{
-					GrenadeInfo_t info;
-					if (!cGrenade.GetInfo(i, &info))
-						continue;
-
-					int iGrenadeID = StringToWeapon(info.szWeapon);
-
-
-					if (!local->GetBaseWeapon())
-						continue;
-
-					if (!(local->GetBaseWeapon()->GeteAttributableItem()->GetItemDefinitionIndex2() == iGrenadeID || (iGrenadeID == 46 && local->GetBaseWeapon()->GeteAttributableItem()->GetItemDefinitionIndex2() == 48)))
-						continue;
-
-					Vector vecOnScreenOrigin, vecOnScreenAngles;
-					int iCenterY, iCenterX;
-					Interfaces::Engine()->GetScreenSize(iCenterY, iCenterX);
-					iCenterX /= 2;
-					iCenterY /= 2;
-
-					float dist = sqrt(pow(local->GetRenderOrigin().x - info.vecOrigin.x, 2) + pow(local->GetRenderOrigin().y - info.vecOrigin.y, 2) + pow(local->GetRenderOrigin().z - info.vecOrigin.z, 2)) * 0.0254f;
-
-					if (dist < 0.5f)
-					{
-						if (WorldToScreen(info.vecOrigin, vecOnScreenOrigin))
-							g_pRender->DrawWave1(info.vecOrigin, 4, Color::Red());
-
-
-						Vector vecAngles;
-						AngleVectors(info.vecViewangles, vecAngles);
-						vecAngles *= 100;
-						if (WorldToScreen((Client::g_pPlayers->GetLocal()->m_pEntity->GetEyePosition() + vecAngles), vecAngles))
-							g_pRender->DrawCircle(Vector2D(vecAngles.x, vecAngles.y), 15, 15, Color::Red());
-						g_pRender->DrawWave1(info.vecOrigin, 7, Color(GrenadeHelper));
-						;
-						if (info.szName.c_str())
-							g_pRender->Text(iCenterX, iCenterY + 20, false, true, Color::White(), info.szName.c_str());
-						if (info.szDescription.c_str())
-							g_pRender->Text(iCenterX, iCenterY, false, true, Color::White(), info.szDescription.c_str());
-
-					}
-					else
-					{
-						if (WorldToScreen(info.vecOrigin, vecOnScreenOrigin))
-						{
-							g_pRender->DrawWave1(info.vecOrigin, 10, Color(GrenadeHelper));
-							g_pRender->DrawWave1(info.vecOrigin, 7, Color(GrenadeHelper));
-						}
-					}
-				}
-			}
-
 		}
 	}
 
-	if (Settings::Esp::esp_Bomb || Settings::Esp::esp_BombPlanted || Settings::Esp::esp_WorldWeapons || Settings::Esp::esp_WorldGrenade || Settings::Esp::esp_Animals)
+	Color GrenadeHelper = Color(int(Settings::Esp::GrenadeHelper[0] * 255.f),
+		int(Settings::Esp::GrenadeHelper[1] * 255.f),
+		int(Settings::Esp::GrenadeHelper[2] * 255.f));
+
+	if (Settings::Esp::helper && Interfaces::Engine()->IsConnected())
+	{
+
+		CBaseEntity* local = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+		for (int i = 0; i < cGrenade.GrenadeInfo.size(); i++)
+		{
+			GrenadeInfo_t info;
+			if (!cGrenade.GetInfo(i, &info))
+				continue;
+
+			int iGrenadeID = StringToWeapon(info.szWeapon);
+
+
+			if (!local->GetBaseWeapon())
+				continue;
+
+			if (!(local->GetBaseWeapon()->GeteAttributableItem()->GetItemDefinitionIndex2() == iGrenadeID || (iGrenadeID == 46 && local->GetBaseWeapon()->GeteAttributableItem()->GetItemDefinitionIndex2() == 48)))
+				continue;
+
+			Vector vecOnScreenOrigin, vecOnScreenAngles;
+			int iCenterY, iCenterX;
+			Interfaces::Engine()->GetScreenSize(iCenterY, iCenterX);
+			iCenterX /= 2;
+			iCenterY /= 2;
+
+			float dist = sqrt(pow(local->GetRenderOrigin().x - info.vecOrigin.x, 2) + pow(local->GetRenderOrigin().y - info.vecOrigin.y, 2) + pow(local->GetRenderOrigin().z - info.vecOrigin.z, 2)) * 0.0254f;
+
+			if (dist < 0.5f)
+			{
+				if (WorldToScreen(info.vecOrigin, vecOnScreenOrigin))
+					g_pRender->DrawWave1(info.vecOrigin, 4, Color::Red());
+
+				Vector vecAngles;
+				AngleVectors(info.vecViewangles, vecAngles);
+				vecAngles *= 100;
+
+				if (WorldToScreen((local->GetEyePosition() + vecAngles), vecAngles))
+					g_pRender->DrawFillBox(vecAngles.x, vecAngles.y, 7, 7, Color::Green());
+
+				g_pRender->Text(iCenterX, iCenterY + 30, true, true, Color::White(), (char*)info.szName.c_str());
+				g_pRender->Text(iCenterX, iCenterY, true, true, Color::White(), (char*)info.szDescription.c_str());
+
+			}
+			else
+			{
+				if (WorldToScreen(info.vecOrigin, vecOnScreenOrigin));
+
+				g_pRender->DrawWave1(info.vecOrigin, 10, Color(GrenadeHelper));
+				g_pRender->DrawWave1(info.vecOrigin, 7, Color(GrenadeHelper));
+			}
+		}
+	}
+	else
+	{
+		cGrenade.GrenadeInfo.clear();
+	}
+
+
+
+
+
+
+	if (Settings::Esp::esp_Bomb || Settings::Esp::esp_WorldWeapons || Settings::Esp::esp_WorldGrenade || Settings::Esp::esp_Chicken || Settings::Esp::esp_Fish )
 	{
 		for (int EntIndex = 0; EntIndex < Interfaces::EntityList()->GetHighestEntityIndex(); EntIndex++)
 		{
@@ -675,183 +969,424 @@ void CEsp::OnRender()
 
 					if (WorldToScreen(pEntity->GetRenderOrigin(), vEntScreen))
 					{
-						if (Settings::Esp::esp_Animals && (pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CChicken))
+
+						if (Settings::Esp::esp_Chicken && (pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CChicken))
 						{
-							g_pRender->DrawOutlineBox((int)vEntScreen.x - 5, (int)vEntScreen.y - 20, 10, 10, Color::Aqua());
-							g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::YellowGreen(),
+							g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Green(),
 								"Chicken");
 						}
 
-						if (Settings::Esp::esp_Animals && (pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CFish))
+						if (Settings::Esp::esp_Fish && (pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CFish))
 						{
 							g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Green(),
 								"Fish");
 						}
 
-						if (Settings::Esp::esp_BombPlanted && (pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CPlantedC4))
+						if (Settings::Esp::esp_WeaponIcon == 0)
 						{
-							g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y + 10, true, true, Color::Yellow(), "%0.2f", g_pEsp->fC4Timer);
-						}
-
-						if (Settings::Esp::esp_BombPlanted && pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CPlantedC4)
-						{
-							g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Red(),
-								"[C4 PLANTED]");
-						}
-
-						switch (Settings::Esp::esp_WeaponIcon)
-						{
-						case 0:
 							if (Settings::Esp::esp_Bomb && pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CC4)
 							{
-								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y + iHpAmY, true, true, Color::Aqua(),
+								//g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Green(),
+								//	"[C4]");
+								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y + iHpAmY, true, true, Color::Green(),
 									"[C4]");
 								iHpAmY += 20;
 							}
-							break;
-						case 1:
-							if (Settings::Esp::esp_Bomb && pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CC4)
+							if (Settings::Esp::esp_Bomb && pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CPlantedC4)
 							{
-								g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y + iHpAmY, true, true, Color::Aqua(), "o");
-								iHpAmY += 20;
+								//bool rainbow; 
+								static float rainbow;
+								rainbow += 0.005f;
+								if (rainbow > 1.f) rainbow = 0.f;
+								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::FromHSB(rainbow, 1.f, 1.f),
+									"[C4]");
+								//Color::Yellow(),"[#[C4]#]");
 							}
-							break;
-						}
-						if (Settings::Esp::esp_WorldWeapons && !strstr(pModelName, "models/weapons/w_eq_")
-							&& !strstr(pModelName, "models/weapons/w_ied"))
-						{
-							if (strstr(pModelName, "models/weapons/w_") && strstr(pModelName, "_dropped.mdl"))
+							if (Settings::Esp::esp_WorldWeapons && !strstr(pModelName, "models/weapons/w_eq_")
+								&& !strstr(pModelName, "models/weapons/w_ied"))
 							{
-								string WeaponName = pModelName + 17;
+								if (strstr(pModelName, "models/weapons/w_") && strstr(pModelName, "_dropped.mdl"))
+								{
+									string WeaponName = pModelName + 17;
 
-								Color ColorWorldWeapon = Color(int(Settings::Esp::WorldWeapon_Color[0] * 255.f),
-									int(Settings::Esp::WorldWeapon_Color[1] * 255.f),
-									int(Settings::Esp::WorldWeapon_Color[2] * 255.f));
+									Color ColorWorldWeapon = Color(int(Settings::Esp::WorldWeapon_Color[0] * 255.f),
+										int(Settings::Esp::WorldWeapon_Color[1] * 255.f),
+										int(Settings::Esp::WorldWeapon_Color[2] * 255.f));
 
-								WeaponName[WeaponName.size() - 12] = '\0';
+									WeaponName[WeaponName.size() - 12] = '\0';
 
-								if (strstr(pModelName, "models/weapons/w_rif") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName.erase(0, 4);
-								}
-								else if (strstr(pModelName, "models/weapons/w_pist") && strstr(pModelName, "_dropped.mdl") && !strstr(pModelName, "models/weapons/w_pist_223"))
-								{
-									WeaponName.erase(0, 5);
-								}
-								else if (strstr(pModelName, "models/weapons/w_smg") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName.erase(0, 4);
-								}
-								else if (strstr(pModelName, "models/weapons/w_mach") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName.erase(0, 5);
-								}
-								else if (strstr(pModelName, "models/weapons/w_shot") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName.erase(0, 5);
-								}
-								else if (strstr(pModelName, "models/weapons/w_snip") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName.erase(0, 5);
-								}
-								if (strstr(pModelName, "models/weapons/w_pist_223") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName = "usp_s";
-								}
-								if (strstr(pModelName, "models/weapons/w_pist_hkp2000") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName = "p2000";
-								}
-								if (strstr(pModelName, "models/weapons/w_pist_cz_75") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName = "cz75";
-								}
-								if (strstr(pModelName, "models/weapons/w_rif_m4a1") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName = "m4a4";
-								}
-								if (strstr(pModelName, "models/weapons/w_rif_m4a1_s") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName = "m4a1_s";
-								}
-								if (strstr(pModelName, "models/weapons/w_rif_sg556") && strstr(pModelName, "_dropped.mdl"))
-								{
-									WeaponName = "sg553";
-								}
+									if (strstr(pModelName, "models/weapons/w_rif") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName.erase(0, 4);
+									}
+									else if (strstr(pModelName, "models/weapons/w_pist") && strstr(pModelName, "_dropped.mdl") && !strstr(pModelName, "models/weapons/w_pist_223"))
+									{
+										WeaponName.erase(0, 5);
+									}
+									else if (strstr(pModelName, "models/weapons/w_smg") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName.erase(0, 4);
+									}
+									else if (strstr(pModelName, "models/weapons/w_mach") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName.erase(0, 5);
+									}
+									else if (strstr(pModelName, "models/weapons/w_shot") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName.erase(0, 5);
+									}
+									else if (strstr(pModelName, "models/weapons/w_snip") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName.erase(0, 5);
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_223") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "usp_s";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_hkp2000") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "p2000";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_cz_75") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "cz75";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_m4a1") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "m4a4";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_m4a1_s") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "m4a1_s";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_sg556") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "sg553";
+									}
 
-								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, ColorWorldWeapon,
-									WeaponName.c_str());
+									g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, ColorWorldWeapon,
+										WeaponName.c_str());
+								}
 							}
-						}
 
-						if (Settings::Esp::esp_WorldGrenade &&
-							(strstr(pModelName, "models/weapons/w_eq_") ||
-								strstr(pModelName, "models/Weapons/w_eq_")))
-						{
-							if (strstr(pModelName, "_dropped.mdl"))
+							if (Settings::Esp::esp_WorldGrenade &&
+								(strstr(pModelName, "models/weapons/w_eq_") ||
+									strstr(pModelName, "models/Weapons/w_eq_")))
 							{
-								string WeaponName = pModelName + 20;
-
-								WeaponName[WeaponName.size() - 12] = '\0';
-
-								Color GrenadeColor = Color::White();
-
-								if (strstr(pModelName, "fraggrenade"))
+								if (strstr(pModelName, "_dropped.mdl"))
 								{
-									WeaponName = "grenade";
-									GrenadeColor = Color::OrangeRed();
-								}
-								else if (strstr(pModelName, "molotov"))
-								{
-									WeaponName = "fire_molo";
-									GrenadeColor = Color::Orange();
-								}
-								else if (strstr(pModelName, "incendiarygrenade"))
-								{
-									WeaponName = "fire_ince";
-									GrenadeColor = Color::Orange();
-								}
-								else if (strstr(pModelName, "flashbang"))
-								{
-									WeaponName = "flash";
-									GrenadeColor = Color::Yellow();
-								}
-								else if (strstr(pModelName, "smokegrenade"))
-								{
-									WeaponName = "smoke";
-									GrenadeColor = Color::Color::LightGray();
-								}
+									string WeaponName = pModelName + 20;
 
-								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, GrenadeColor,
-									WeaponName.c_str());
-							}
-							else if (strstr(pModelName, "smokegrenade_thrown.mdl") && Settings::Misc::misc_NoSmoke == true)
-							{
-								string WeaponName = "Smoke";
-								g_pRender->DrawOutlineBox((int)vEntScreen.x - 20, (int)vEntScreen.y - 35, 40, 40, Color::Purple());
-								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::MediumPurple(),
-									WeaponName.c_str());
+									WeaponName[WeaponName.size() - 12] = '\0';
 
-							}
-							else if (strstr(pModelName, "smokegrenade_thrown.mdl"))
-							{
-								string WeaponName = "smoke";
+									Color GrenadeColor = Color::White();
 
-								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Gray(),
-									WeaponName.c_str());
-							}
-							else if (strstr(pModelName, "taser.mdl") && Settings::Esp::esp_Outline == true)
-							{
-								string WeaponName = "zeus";
-								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::LightSkyBlue(),
-									WeaponName.c_str());
+									if (strstr(pModelName, "fraggrenade"))
+									{
+										WeaponName = "grenade";
+										GrenadeColor = Color::OrangeRed();
+									}
+									else if (strstr(pModelName, "molotov"))
+									{
+										WeaponName = "fire_molo";
+										GrenadeColor = Color::Orange();
+									}
+									else if (strstr(pModelName, "incendiarygrenade"))
+									{
+										WeaponName = "fire_ince";
+										GrenadeColor = Color::Orange();
+									}
+									else if (strstr(pModelName, "flashbang"))
+									{
+										WeaponName = "flash";
+										GrenadeColor = Color::Yellow();
+									}
+									else if (strstr(pModelName, "smokegrenade"))
+									{
+										WeaponName = "smoke";
+										GrenadeColor = Color::LightGray();
+									}
+									if (strstr(pModelName, "decoy"))
+									{
+										WeaponName = "decoy";
+										GrenadeColor = Color::Brown();
+									}
 
+									g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, GrenadeColor,
+										WeaponName.c_str());
+								}
+								else if (strstr(pModelName, "smokegrenade_thrown.mdl") && Settings::Misc::misc_NoSmoke == true)
+								{
+									string WeaponName = "Smoke";
+									g_pRender->DrawOutlineBox((int)vEntScreen.x - 20, (int)vEntScreen.y - 35, 40, 40, Color::Purple());
+									g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::MediumPurple(),
+										WeaponName.c_str());
+
+								}
+								else if (strstr(pModelName, "smokegrenade_thrown.mdl"))
+								{
+									string WeaponName = "smoke";
+
+									g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Gray(),
+										WeaponName.c_str());
+								}
+								else if (strstr(pModelName, "taser.mdl") && Settings::Esp::esp_Outline == true)
+								{
+									string WeaponName = "zeus";
+									g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::LightSkyBlue(),
+										WeaponName.c_str());
+
+								}
 							}
 							else if (strstr(pModelName, "w_defuser.mdl"))
 							{
-								string WeaponName = "defuse kit";
+								string WeaponName = "defuser";
 
 								g_pRender->Text((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::LimeGreen(),
+									WeaponName.c_str());
+							}
+						}
+						if (Settings::Esp::esp_WeaponIcon == 1)
+						{
+							if (Settings::Esp::esp_Bomb && pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CC4)
+							{
+								g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y + iHpAmY, true, true, Color::Green(),
+									"o");
+								iHpAmY += 20;
+							}
+							if (Settings::Esp::esp_Bomb && pEntity->GetClientClass()->m_ClassID == (int)CLIENT_CLASS_ID::CPlantedC4)
+							{
+								static float rainbow;
+								rainbow += 0.005f;
+								if (rainbow > 1.f) rainbow = 0.f;
+								g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::FromHSB(rainbow, 1.f, 1.f),
+									"o");
+							}
+							if (Settings::Esp::esp_WorldWeapons && !strstr(pModelName, "models/weapons/w_eq_")
+								&& !strstr(pModelName, "models/weapons/w_ied"))
+							{
+								if (strstr(pModelName, "models/weapons/w_") && strstr(pModelName, "_dropped.mdl"))
+								{
+									string WeaponName = pModelName + 17;
+
+									Color ColorWorldWeapon = Color(int(Settings::Esp::WorldWeapon_Color[0] * 255.f),
+										int(Settings::Esp::WorldWeapon_Color[1] * 255.f),
+										int(Settings::Esp::WorldWeapon_Color[2] * 255.f));
+
+									WeaponName[WeaponName.size() - 12] = '\0';
+
+									if (strstr(pModelName, "models/weapons/w_pist_223") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "G";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_cz_75") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "I";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_deagle") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "A";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_elite") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "B";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_fiveseven") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "C";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_glock18") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "D";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_hkp2000") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "E";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_p250") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "F";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_revolver") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "J";
+									}
+									if (strstr(pModelName, "models/weapons/w_pist_tec9") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "H";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_aug") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "U";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_ak47") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "W";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_famas") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "R";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_galilar") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "Q";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_m4a1") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "S";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_m4a1_s") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "T";
+									}
+									if (strstr(pModelName, "models/weapons/w_rif_sg556") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "V";
+									}
+									if (strstr(pModelName, "models/weapons/w_snip_awp") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "Z";
+									}
+									if (strstr(pModelName, "models/weapons/w_snip_g3sg1") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "X";
+									}
+									if (strstr(pModelName, "models/weapons/w_snip_scar20") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "Y";
+									}
+									if (strstr(pModelName, "models/weapons/w_snip_ssg08") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "a";
+									}
+									if (strstr(pModelName, "models/weapons/w_shot_mag7") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "d";
+									}
+									if (strstr(pModelName, "models/weapons/w_shot_nova") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "e";
+									}
+									if (strstr(pModelName, "models/weapons/w_shot_sawedoff") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "c";
+									}
+									if (strstr(pModelName, "models/weapons/w_shot_xm1014") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "b";
+									}
+									if (strstr(pModelName, "models/weapons/w_smg_bizon") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "M";
+									}
+									if (strstr(pModelName, "models/weapons/w_smg_mac10") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "K";
+									}
+									if (strstr(pModelName, "models/weapons/w_smg_mp7") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "N";
+									}
+									if (strstr(pModelName, "models/weapons/w_smg_mp9") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "O";
+									}
+									if (strstr(pModelName, "models/weapons/w_smg_p90") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "P";
+									}
+									if (strstr(pModelName, "models/weapons/w_smg_ump45") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "L";
+									}
+									if (strstr(pModelName, "models/weapons/w_mach_m249") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "g";
+									}
+									if (strstr(pModelName, "models/weapons/w_mach_negev") && strstr(pModelName, "_dropped.mdl"))
+									{
+										WeaponName = "f";
+									}
+
+									g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, ColorWorldWeapon,
+										WeaponName.c_str());
+								}
+							}
+
+							if (Settings::Esp::esp_WorldGrenade &&
+								(strstr(pModelName, "models/weapons/w_eq_") ||
+									strstr(pModelName, "models/Weapons/w_eq_")))
+							{
+								if (strstr(pModelName, "_dropped.mdl"))
+								{
+									string WeaponName = pModelName + 20;
+
+									WeaponName[WeaponName.size() - 12] = '\0';
+
+									Color GrenadeColor = Color::White();
+
+									if (strstr(pModelName, "fraggrenade"))
+									{
+										WeaponName = "j";
+										GrenadeColor = Color::OrangeRed();
+									}
+									else if (strstr(pModelName, "molotov"))
+									{
+										WeaponName = "l";
+										GrenadeColor = Color::Orange();
+									}
+									else if (strstr(pModelName, "incendiarygrenade"))
+									{
+										WeaponName = "n";
+										GrenadeColor = Color::Orange();
+									}
+									else if (strstr(pModelName, "flashbang"))
+									{
+										WeaponName = "i";
+										GrenadeColor = Color::Yellow();
+									}
+									else if (strstr(pModelName, "smokegrenade"))
+									{
+										WeaponName = "k";
+										GrenadeColor = Color::LightGray();
+									}
+									if (strstr(pModelName, "decoy"))
+									{
+										WeaponName = "m";
+										GrenadeColor = Color::Brown();
+									}
+
+									g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, GrenadeColor,
+										WeaponName.c_str());
+								}
+								else if (strstr(pModelName, "smokegrenade_thrown.mdl") && Settings::Misc::misc_NoSmoke == true)
+								{
+									string WeaponName = "k";
+									g_pRender->DrawOutlineBox((int)vEntScreen.x - 20, (int)vEntScreen.y - 35, 40, 40, Color::Purple());
+									g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::MediumPurple(),
+										WeaponName.c_str());
+
+								}
+								else if (strstr(pModelName, "smokegrenade_thrown.mdl"))
+								{
+									string WeaponName = "k";
+
+									g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::Gray(),
+										WeaponName.c_str());
+								}
+								else if (strstr(pModelName, "taser.mdl") && Settings::Esp::esp_Outline == true)
+								{
+									string WeaponName = "h";
+									g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::LightSkyBlue(),
+										WeaponName.c_str());
+
+								}
+							}
+							else if (strstr(pModelName, "w_defuser.mdl"))
+							{
+								string WeaponName = "r";
+
+								g_pRender->WepIcon((int)vEntScreen.x, (int)vEntScreen.y, true, true, Color::LimeGreen(),
 									WeaponName.c_str());
 							}
 						}
@@ -862,7 +1397,7 @@ void CEsp::OnRender()
 	}
 
 	// Draw Ticks
-	if (Settings::Aimbot::aim_Backtrack && Settings::Aimbot::aim_DrawBacktrack)
+	if (Settings::Aimbot::aim_Backtrack && Settings::Aimbot::aim_DrawBacktrack) // Use Esp Visible Combo to change from visible only and not visible.
 	{
 		for (int i = 0; i < Interfaces::EntityList()->GetHighestEntityIndex(); i++)
 		{
@@ -937,8 +1472,7 @@ void MsgFunc_ServerRankRevealAll()
 	if (!ServerRankRevealAll)
 	{
 		ServerRankRevealAll = (tServerRankRevealAllFn)(
-			CSX::Memory::FindPattern(CLIENT_DLL, 
-				"55 8B EC 8B 0D ? ? ? ? 85 C9 75 28 A1 ? ? ? ? 68 ? ? ? ? 8B 08 8B 01 FF 50 04 85 C0 74 0B 8B C8 E8 ? ? ? ? 8B C8 EB 02 33 C9 89 0D ? ? ? ? 8B 45 08", 0));
+			CSX::Memory::FindPattern(CLIENT_DLL, "55 8B EC 8B 0D ? ? ? ? 68", 0));
 	}
 
 	if (ServerRankRevealAll)
@@ -948,20 +1482,18 @@ void MsgFunc_ServerRankRevealAll()
 	}
 }
 
-void CEsp::OnCreateMove(CUserCmd* pCmd)
+void CEsp::OnCreateMove(CUserCmd* cmd)
 {
-	if (Settings::Esp::esp_Rank && pCmd->buttons & IN_SCORE)
-	{
+	if (Settings::Esp::esp_Rank && cmd->buttons & IN_SCORE)
 		MsgFunc_ServerRankRevealAll();
-	}
-	else
-	{
-		//off
-	}
+
+	g_pEsp->SoundEsp.Update();
 }
 
 void CEsp::OnReset()
 {
+	g_pEsp->SoundEsp.Sound.clear();
+
 	if (Settings::Esp::esp_BombTimer)
 	{
 		if (Settings::Esp::esp_BombTimer > 60)
@@ -971,6 +1503,8 @@ void CEsp::OnReset()
 		iC4Timer = Settings::Esp::esp_BombTimer;
 	}
 }
+
+
 
 void CEsp::OnEvents(IGameEvent* pEvent)
 {
@@ -985,6 +1519,27 @@ void CEsp::OnEvents(IGameEvent* pEvent)
 			bC4Timer = true;
 		}
 	}
+	if (Settings::Esp::DamageIndicator)
+	{
+		if (strcmp(pEvent->GetName(), "player_hurt") == 0)
+		{
+			CBaseEntity* hurt = (CBaseEntity*)(Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetPlayerForUserID(pEvent->GetInt("userid"))));
+			CBaseEntity* attacker = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetPlayerForUserID(pEvent->GetInt("attacker")));
+			CBaseEntity* pLocal = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+
+			if (hurt != pLocal && attacker == pLocal)
+			{
+				DamageIndicator_t DmgIndicator;
+				DmgIndicator.iDamage = pEvent->GetInt("dmg_health");
+				DmgIndicator.Player = hurt;
+				DmgIndicator.flEraseTime = pLocal->GetTickBase() * Interfaces::GlobalVars()->interval_per_tick + 3.f;
+				DmgIndicator.bInitialized = false;
+
+				DamageIndicator.push_back(DmgIndicator);
+			}
+		}
+	}
+
 }
 
 void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &state, const ModelRenderInfo_t &pInfo, matrix3x4_t *pCustomBoneToWorld)
@@ -1000,12 +1555,18 @@ void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &st
 		visible_tex = CreateMaterial(false, false);
 		hidden_flat = CreateMaterial(true, true);
 		hidden_tex = CreateMaterial(false, true);
+
 		InitalizeMaterial = true;
 
 		return;
 	}
 
+	
+
+
 	string strModelName = Interfaces::ModelInfo()->GetModelName(pInfo.pModel);
+
+
 
 	if (strModelName.size() <= 1)
 		return;
@@ -1021,6 +1582,7 @@ void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &st
 			if (pPlayer && pPlayer->bUpdate)
 			{
 				bool CheckTeam = false;
+				int playerHealth = pPlayer->iHealth;
 
 				Color TeamHideColor;
 				Color TeamVisibleColor;
@@ -1031,16 +1593,312 @@ void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &st
 				if (Settings::Esp::esp_Team && pPlayer->Team == g_pPlayers->GetLocal()->Team) // Ñâîèõ
 					CheckTeam = true;
 
-				int playerHealth = pPlayer->iHealth;
+				
 
 				if (pPlayer->Team == TEAM_CT)
 				{
+					if (Settings::Esp::esp_HealthChams)
+					{
+						if (playerHealth >= 95)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0;
+							Settings::Esp::chams_Color_TT[1] = 1;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0;
+							Settings::Esp::chams_Color_CT[1] = 1;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0;
+							Settings::Esp::chams_Color_VTT[1] = 1;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0;
+							Settings::Esp::chams_Color_VCT[1] = 1;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 90 && playerHealth < 95)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.15;
+							Settings::Esp::chams_Color_TT[1] = 0.85;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.15;
+							Settings::Esp::chams_Color_CT[1] = 0.85;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.15;
+							Settings::Esp::chams_Color_VTT[1] = 0.85;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.15;
+							Settings::Esp::chams_Color_VCT[1] = 0.85;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 80 && playerHealth < 90)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.3;
+							Settings::Esp::chams_Color_TT[1] = 0.7;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.3;
+							Settings::Esp::chams_Color_CT[1] = 0.7;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.3;
+							Settings::Esp::chams_Color_VTT[1] = 0.7;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.3;
+							Settings::Esp::chams_Color_VCT[1] = 0.7;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 60 && playerHealth < 80)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.5;
+							Settings::Esp::chams_Color_TT[1] = 0.5;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.5;
+							Settings::Esp::chams_Color_CT[1] = 0.5;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.5;
+							Settings::Esp::chams_Color_VTT[1] = 0.5;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.5;
+							Settings::Esp::chams_Color_VCT[1] = 0.5;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 40 && playerHealth < 60)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.7;
+							Settings::Esp::chams_Color_TT[1] = 0.3;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.7;
+							Settings::Esp::chams_Color_CT[1] = 0.3;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.7;
+							Settings::Esp::chams_Color_VTT[1] = 0.3;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.7;
+							Settings::Esp::chams_Color_VCT[1] = 0.3;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 20 && playerHealth < 40)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.85;
+							Settings::Esp::chams_Color_TT[1] = 0.15;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.85;
+							Settings::Esp::chams_Color_CT[1] = 0.15;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.85;
+							Settings::Esp::chams_Color_VTT[1] = 0.15;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.85;
+							Settings::Esp::chams_Color_VCT[1] = 0.15;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 10 && playerHealth < 20)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.9;
+							Settings::Esp::chams_Color_TT[1] = 0.1;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.9;
+							Settings::Esp::chams_Color_CT[1] = 0.1;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.9;
+							Settings::Esp::chams_Color_VTT[1] = 0.1;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.9;
+							Settings::Esp::chams_Color_VCT[1] = 0.1;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 10 && playerHealth < 20)
+						{
+							Settings::Esp::chams_Color_TT[0] = 1;
+							Settings::Esp::chams_Color_TT[1] = 0;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 1;
+							Settings::Esp::chams_Color_CT[1] = 0;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 1;
+							Settings::Esp::chams_Color_VTT[1] = 0;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 1;
+							Settings::Esp::chams_Color_VCT[1] = 0;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+					}
+
 					TeamHideColor = Color(int(Settings::Esp::chams_Color_CT[0] * 255.f),
 						int(Settings::Esp::chams_Color_CT[1] * 255.f),
 						int(Settings::Esp::chams_Color_CT[2] * 255.f));
 				}
 				else if (pPlayer->Team == TEAM_TT)
 				{
+					if (Settings::Esp::esp_HealthChams)
+					{
+						if (playerHealth >= 95)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0;
+							Settings::Esp::chams_Color_TT[1] = 1;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0;
+							Settings::Esp::chams_Color_CT[1] = 1;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0;
+							Settings::Esp::chams_Color_VTT[1] = 1;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0;
+							Settings::Esp::chams_Color_VCT[1] = 1;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 90 && playerHealth < 95)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.15;
+							Settings::Esp::chams_Color_TT[1] = 0.85;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.15;
+							Settings::Esp::chams_Color_CT[1] = 0.85;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.15;
+							Settings::Esp::chams_Color_VTT[1] = 0.85;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.15;
+							Settings::Esp::chams_Color_VCT[1] = 0.85;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 80 && playerHealth < 90)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.3;
+							Settings::Esp::chams_Color_TT[1] = 0.7;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.3;
+							Settings::Esp::chams_Color_CT[1] = 0.7;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.3;
+							Settings::Esp::chams_Color_VTT[1] = 0.7;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.3;
+							Settings::Esp::chams_Color_VCT[1] = 0.7;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 60 && playerHealth < 80)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.5;
+							Settings::Esp::chams_Color_TT[1] = 0.5;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.5;
+							Settings::Esp::chams_Color_CT[1] = 0.5;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.5;
+							Settings::Esp::chams_Color_VTT[1] = 0.5;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.5;
+							Settings::Esp::chams_Color_VCT[1] = 0.5;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 40 && playerHealth < 60)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.7;
+							Settings::Esp::chams_Color_TT[1] = 0.3;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.7;
+							Settings::Esp::chams_Color_CT[1] = 0.3;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.7;
+							Settings::Esp::chams_Color_VTT[1] = 0.3;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.7;
+							Settings::Esp::chams_Color_VCT[1] = 0.3;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 20 && playerHealth < 40)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.85;
+							Settings::Esp::chams_Color_TT[1] = 0.15;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.85;
+							Settings::Esp::chams_Color_CT[1] = 0.15;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.85;
+							Settings::Esp::chams_Color_VTT[1] = 0.15;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.85;
+							Settings::Esp::chams_Color_VCT[1] = 0.15;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 10 && playerHealth < 20)
+						{
+							Settings::Esp::chams_Color_TT[0] = 0.9;
+							Settings::Esp::chams_Color_TT[1] = 0.1;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 0.9;
+							Settings::Esp::chams_Color_CT[1] = 0.1;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 0.9;
+							Settings::Esp::chams_Color_VTT[1] = 0.1;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 0.9;
+							Settings::Esp::chams_Color_VCT[1] = 0.1;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+						if (playerHealth >= 10 && playerHealth < 20)
+						{
+							Settings::Esp::chams_Color_TT[0] = 1;
+							Settings::Esp::chams_Color_TT[1] = 0;
+							Settings::Esp::chams_Color_TT[2] = 0;
+
+							Settings::Esp::chams_Color_CT[0] = 1;
+							Settings::Esp::chams_Color_CT[1] = 0;
+							Settings::Esp::chams_Color_CT[2] = 0;
+
+							Settings::Esp::chams_Color_VTT[0] = 1;
+							Settings::Esp::chams_Color_VTT[1] = 0;
+							Settings::Esp::chams_Color_VTT[2] = 0;
+
+							Settings::Esp::chams_Color_VCT[0] = 1;
+							Settings::Esp::chams_Color_VCT[1] = 0;
+							Settings::Esp::chams_Color_VCT[2] = 0;
+						}
+					}
+
 					TeamHideColor = Color(int(Settings::Esp::chams_Color_TT[0] * 255.f),
 						int(Settings::Esp::chams_Color_TT[1] * 255.f),
 						int(Settings::Esp::chams_Color_TT[2] * 255.f));
@@ -1080,17 +1938,10 @@ void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &st
 							ForceMaterial(TeamHideColor, hidden_flat);
 							hidden_flat->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, true);
 						}
-						else if (Settings::Esp::esp_Chams == 2)
+						else if (Settings::Esp::esp_Chams >= 2)
 						{
 							ForceMaterial(TeamHideColor, hidden_tex);
 							hidden_tex->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, true);
-						}
-						else if (Settings::Esp::esp_Chams == 3)
-						{
-							float Blend[3] = { (float)TeamVisibleColor[0] / 255.f * Settings::Esp::esp_Chams_Light,
-								(float)TeamVisibleColor[1] / 255.f * Settings::Esp::esp_Chams_Light, 
-								(float)TeamVisibleColor[2] / 255.f * Settings::Esp::esp_Chams_Light };
-							Interfaces::RenderView()->SetColorModulation(Blend);
 						}
 					}
 					else
@@ -1100,17 +1951,10 @@ void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &st
 							ForceMaterial(TeamHideColor, hidden_flat);
 							hidden_flat->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
 						}
-						else if (Settings::Esp::esp_Chams == 2)
+						else if (Settings::Esp::esp_Chams >= 2)
 						{
 							ForceMaterial(TeamHideColor, hidden_tex);
 							hidden_tex->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
-						}
-						else if (Settings::Esp::esp_Chams == 3)
-						{
-							float Blend[3] = { (float)TeamVisibleColor[0] / 255.f * Settings::Esp::esp_Chams_Light, 
-								(float)TeamVisibleColor[1] / 255.f * Settings::Esp::esp_Chams_Light, 
-								(float)TeamVisibleColor[2] / 255.f * Settings::Esp::esp_Chams_Light };
-							Interfaces::RenderView()->SetColorModulation(Blend);
 						}
 					}
 
@@ -1121,17 +1965,10 @@ void CEsp::OnDrawModelExecute(IMatRenderContext* ctx, const DrawModelState_t &st
 						ForceMaterial(TeamVisibleColor, visible_flat);
 						visible_flat->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
 					}
-					else if (Settings::Esp::esp_Chams == 2)
+					else if (Settings::Esp::esp_Chams >= 2)
 					{
 						ForceMaterial(TeamVisibleColor, visible_tex);
 						visible_tex->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
-					}
-					else if (Settings::Esp::esp_Chams == 3)
-					{
-						float Blend[3] = { (float)TeamVisibleColor[0] / 255.f * Settings::Esp::esp_Chams_Light, 
-							(float)TeamVisibleColor[1] / 255.f * Settings::Esp::esp_Chams_Light, 
-							(float)TeamVisibleColor[2] / 255.f * Settings::Esp::esp_Chams_Light };
-						Interfaces::RenderView()->SetColorModulation(Blend);
 					}
 				}
 			}
@@ -1156,6 +1993,21 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 	else if (Settings::Esp::esp_Size > 10)
 	{
 		Settings::Esp::esp_Size = 10;
+	}
+
+
+#define VK_MOUSE5 0x06
+
+	if (Settings::Esp::esp_CapitalToggle)
+	{
+		if (GetAsyncKeyState(VK_CAPITAL))
+		{
+			Settings::Esp::esp_Size = 6;
+		}
+		else if (!GetAsyncKeyState(VK_CAPITAL))
+		{
+			Settings::Esp::esp_Size = 0;
+		}
 	}
 
 	int Height = (int)pPlayer->vOriginScreen.y - (int)pPlayer->vHitboxHeadScreen.y;
@@ -1201,7 +2053,6 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 				g_pRender->DrawOutlineCoalBox(x, y, Width, Height, EspVisibleColor);
 			}
 		}
-
 		else if (Settings::Esp::esp_Style == 3)
 		{
 			if (!Settings::Esp::esp_Outline)
@@ -1213,7 +2064,36 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 				g_pRender->GenuineOutlineBox(x, y, Width, Height, EspVisibleColor);
 			}
 		}
+		else if (Settings::Esp::esp_Style == 4)
+		{
+			if (!Settings::Esp::esp_Outline)
+			{
+				g_pRender->DrawAlphaBox(x, y, Width, Height, EspVisibleColor);
+			}
+			else if (Settings::Esp::esp_Outline)
+			{
+				g_pRender->DrawOutlineFillBox(x, y, Width, Height, EspVisibleColor);
+			}
+		}
 	}
+
+	/*if ( Settings::Esp::esp_Line )
+	{
+	Color EspColorLine = Color(int(Settings::Esp::Visuals_Line_Color[0] * 255.f),
+	int(Settings::Esp::Visuals_Line_Color[1] * 255.f),
+	int(Settings::Esp::Visuals_Line_Color[2] * 255.f));
+
+	g_pRender->DrawLine((int)vLineOrigin.x, (int)vLineOrigin.y, iScreenWidth / 2, iScreenHeight, EspColorLine);
+	}
+
+	if ( Settings::Esp::esp_Name )
+	{
+	Color EspColorName = Color(int(Settings::Esp::Name_Color[0] * 255.f),
+	int(Settings::Esp::Name_Color[1] * 255.f),
+	int(Settings::Esp::Name_Color[2] * 255.f));
+
+	g_pRender->Text((int)vLineOrigin.x, (int)pPlayer->vHitboxHeadScreen.y - 13, true, true, EspColorName, pPlayer->Name.c_str());
+	}*/
 
 	if (Settings::Esp::esp_Line)
 	{
@@ -1222,12 +2102,12 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 
 	if (Settings::Esp::esp_Name)
 	{
-		g_pRender->Text((int)vLineOrigin.x, (int)pPlayer->vHitboxHeadScreen.y - 13, true, true, EspVisibleColor, pPlayer->Name.c_str());
+		g_pRender->Text((int)vLineOrigin.x, (int)pPlayer->vHitboxHeadScreen.y - 13, true, true, EspPlayerColor, pPlayer->Name.c_str());
 	}
 
 	int iHpAmY = 1;
 
-	if (Settings::Esp::esp_Health >= 1)
+	if (Settings::Esp::esp_Health >= 1) //None
 	{
 		Color Minus = Color::Red();
 
@@ -1246,7 +2126,7 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 		{
 			if (Settings::Esp::esp_Health == 1) //Number
 			{
-				g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, to_string(iHealth).c_str());
+				g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, /* EspPlayerColor */Color::LawnGreen(), to_string(iHealth).c_str());
 				iHpAmY += 10;
 			}
 			else if (Settings::Esp::esp_Health == 2) //Bottom
@@ -1299,7 +2179,7 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 		{
 			if (Settings::Esp::esp_Armor == 1) //Number
 			{
-				g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, to_string(iArmor).c_str());
+				g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, /* EspPlayerColor */Color::Cyan(), to_string(iArmor).c_str());
 				iHpAmY += 10;
 			}
 			if (Settings::Esp::esp_Armor == 2) //Bottom
@@ -1332,57 +2212,6 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 			}
 		}
 	}
-
-	if (Settings::Esp::esp_Distance && g_pPlayers->GetLocal()->bAlive)
-	{
-		int Distance = pPlayer->iDistance;
-		g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, to_string(Distance).c_str());
-	}
-
-	if (Settings::Esp::esp_Ammo && pPlayer->iWAmmo)
-	{
-		int Ammo = pPlayer->iWAmmo;
-		g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, to_string(Ammo).c_str());
-		iHpAmY += 15;
-	}
-
-	if (Settings::Esp::esp_Infoz)
-	{
-		if (Settings::Esp::esp_Defusing)
-		{
-			if (Interfaces::Engine()->IsInGame())
-			{
-				if (pPlayer->m_pEntity->IsDefusing())
-				{
-					int iHpAmY = 15;
-					g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, ("Defusing"));
-				}
-			}
-		}
-		if (Settings::Esp::esp_Scoped)
-		{
-			if (Interfaces::Engine()->IsInGame())
-			{
-				if (pPlayer->m_pEntity->GetIsScoped())
-				{
-					int iHpAmY = 15;
-					g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, ("Scoped"));
-				}
-			}
-		}
-		if (Settings::Esp::esp_Flashed)
-		{
-			if (Interfaces::Engine()->IsInGame())
-			{
-				if (pPlayer->m_pEntity->IsFlashed())
-				{
-					int iHpAmY = 15;
-					g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, ("Flashed"));
-				}
-			}
-		}
-	}
-
 	switch (Settings::Esp::esp_WeaponIcon)
 	{
 	case 0:
@@ -1458,9 +2287,6 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 			string replace51 = "usp_s";
 			string search52 = "MP9";
 			string replace52 = "mp9";
-			string search53 = "MP5SD";
-			string replace53 = "mp5-sd";
-
 			//grenades
 			string search32 = "HE_Grenade";
 			string replace32 = "grenade";
@@ -1469,43 +2295,38 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 			string search34 = "C4";
 			string replace34 = "c4";
 			string search35 = "MOLOTOV";
-			string replace35 = "fire_molotov";
+			string replace35 = "fire_molo";
 			string search36 = "IncGrenade";
 			string replace36 = "fire_inc";
 			string search37 = "FLASHBANG";
 			string replace37 = "flash";
 			string search38 = "DECOY";
 			string replace38 = "decoy";
-
-			//others
-			string search54 = "DEFUSE_KIT";
-			string replace54 = "defuse_kit";
-
 			//knifes
 			string search39 = "KnifeBayonet";
-			string replace39 = "Knife Bayonet";
+			string replace39 = "†bayonet";
 			string search40 = "KnifeFlip";
-			string replace40 = "Knife Flip";
+			string replace40 = "†flip";
 			string search41 = "KnifeGut";
-			string replace41 = "Knife Gut";
+			string replace41 = "†gut";
 			string search42 = "KnifeM9";
-			string replace42 = "Knife M9bayonet";
+			string replace42 = "†m9";
 			string search43 = "KnifeKaram";
-			string replace43 = "Knife Karambit";
+			string replace43 = "†Karambit";
 			string search44 = "KnifeTactical";
-			string replace44 = "Knife Huntsman";
+			string replace44 = "†huntsman";
 			string search45 = "Knife_Butterfly";
-			string replace45 = "Knife Butterfly";
+			string replace45 = "†butterfly";
 			string search46 = "knife_falchion_advanced";
-			string replace46 = "Knife Falchion";
+			string replace46 = "†falchion";
 			string search47 = "knife_push";
-			string replace47 = "Knife Shadow";
+			string replace47 = "†shadow";
 			string search48 = "knife_survival_bowie";
-			string replace48 = "Knife Bowie";
+			string replace48 = "†bowie";
 			string search49 = "Knife_T";
-			string replace49 = "Knife T";
+			string replace49 = "†";
 			string search50 = "Knife";
-			string replace50 = "Knife CT";
+			string replace50 = "†";
 
 
 			//weapons
@@ -1615,10 +2436,6 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 				WeaponStr.replace(i, search51.size(), replace51);
 			for (int i = WeaponStr.find(search52); i >= 0; i = WeaponStr.find(search52))
 				WeaponStr.replace(i, search52.size(), replace52);
-			for (int i = WeaponStr.find(search53); i >= 0; i = WeaponStr.find(search53))
-				WeaponStr.replace(i, search53.size(), replace53);
-			for (int i = WeaponStr.find(search54); i >= 0; i = WeaponStr.find(search54))
-				WeaponStr.replace(i, search54.size(), replace54);
 
 
 			if (Settings::Esp::esp_Ammo && pPlayer->iWAmmo)
@@ -1628,7 +2445,11 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 				WeaponStr += "]";
 			}
 
-			g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, WeaponStr.c_str());
+			Color EspColorWeaponEnemy = Color(int(Settings::Esp::WeaponEnemy_Color[0] * 255.f),
+				int(Settings::Esp::WeaponEnemy_Color[1] * 255.f),
+				int(Settings::Esp::WeaponEnemy_Color[2] * 255.f));
+
+			g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspColorWeaponEnemy, WeaponStr.c_str());
 			iHpAmY += 10;
 		}break;
 	case 1:
@@ -1705,8 +2526,6 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 			string replace51 = "G";
 			string search52 = "MP9";
 			string replace52 = "O";
-			string search53 = "MP5SD";
-			string replace53 = "z";
 			//grenades
 			string search32 = "HE_Grenade";
 			string replace32 = "j";
@@ -1722,9 +2541,6 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 			string replace37 = "i";
 			string search38 = "DECOY";
 			string replace38 = "m";
-			//Others
-			string search54 = "DEFUSE_KIT";
-			string replace54 = "r";
 			//knifes
 			string search39 = "KnifeBayonet";
 			string replace39 = "1";
@@ -1859,25 +2675,80 @@ void CEsp::DrawPlayerEsp(CPlayer* pPlayer)
 				WeaponStr.replace(i, search51.size(), replace51);
 			for (int i = WeaponStr.find(search52); i >= 0; i = WeaponStr.find(search52))
 				WeaponStr.replace(i, search52.size(), replace52);
-			for (int i = WeaponStr.find(search53); i >= 0; i = WeaponStr.find(search53))
-				WeaponStr.replace(i, search53.size(), replace53);
-			for (int i = WeaponStr.find(search54); i >= 0; i = WeaponStr.find(search54))
-				WeaponStr.replace(i, search54.size(), replace54);
 
-			g_pRender->WepIcon((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspVisibleColor, WeaponStr.c_str());
+
+			/*if (Settings::Esp::esp_Ammo && pPlayer->iWAmmo)
+			{
+			WeaponStr += "   [";
+			WeaponStr += to_string(pPlayer->iWAmmo);
+			WeaponStr += "]";
+			}*/
+			Color EspColorWeaponEnemy = Color(int(Settings::Esp::WeaponEnemy_Color[0] * 255.f),
+				int(Settings::Esp::WeaponEnemy_Color[1] * 255.f),
+				int(Settings::Esp::WeaponEnemy_Color[2] * 255.f));
+			iHpAmY += 5;
+			g_pRender->WepIcon((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspColorWeaponEnemy, WeaponStr.c_str());
 			iHpAmY += 10;
-		}
-		break;
+
+			if (Settings::Esp::esp_Ammo && pPlayer->iWAmmo)
+			{
+				Color EspColorWeaponEnemy = Color(int(Settings::Esp::WeaponEnemy_Color[0] * 255.f),
+					int(Settings::Esp::WeaponEnemy_Color[1] * 255.f),
+					int(Settings::Esp::WeaponEnemy_Color[2] * 255.f));
+				int Ammo = pPlayer->iWAmmo;
+				g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspColorWeaponEnemy, to_string(Ammo).c_str());
+				iHpAmY += 11;
+			}
+		}break;
 	}
+
+
+	if (Settings::Esp::esp_Distance && g_pPlayers->GetLocal()->bAlive)
+	{
+		int Distance = pPlayer->iDistance;
+		g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, EspPlayerColor, to_string(Distance).c_str());
+	}
+
+	if (Settings::Esp::esp_Defusing)
+	{
+		if (pPlayer->m_pEntity->IsDefusing())
+		{
+			int iHpAmY = 10;
+			g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, Color::Cyan(), ("Defusing"));
+		}
+	}
+	if (Settings::Esp::esp_Flashed)
+	{
+		if (pPlayer->m_pEntity->IsFlashed())
+		{
+			int iHpAmY = 10;
+			g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, Color::GreenYellow(), ("Flashed"));
+		}
+	}
+	if (Settings::Esp::esp_InScoped)
+	{
+		if (pPlayer->m_pEntity->GetIsScoped())
+		{
+			int iHpAmY = 10;
+			g_pRender->Text((int)vLineOrigin.x, (int)vLineOrigin.y + iHpAmY, true, true, Color::PaleTurquoise(), ("Scoped"));
+		}
+	}
+
+
+	
+
 }
 
 void CEsp::DrawPlayerSkeleton(CPlayer* pPlayer)
 {
-	Color EspVisibleColor = GetPlayerVisibleColor(pPlayer);
+	Color SkeletonColor = GetPlayerColor(pPlayer);
 
 	for (BYTE IndexArray = 0; IndexArray < 18; IndexArray++)
 	{
-		DrawHitBoxLine(pPlayer->vHitboxSkeletonArray[IndexArray], EspVisibleColor);
+		Color Skelet = Color(int(Settings::Esp::Skelet[0] * 255.f),
+			int(Settings::Esp::Skelet[1] * 255.f),
+			int(Settings::Esp::Skelet[2] * 255.f));
+		DrawHitBoxLine(pPlayer->vHitboxSkeletonArray[IndexArray], Skelet);
 	}
 }
 
@@ -1908,4 +2779,177 @@ void CEsp::DrawHitBoxLine(Vector* vHitBoxArray, Color color)
 		g_pRender->DrawLine((int)vHitBoxOneScreen.x, (int)vHitBoxOneScreen.y,
 			(int)vHitBoxTwoScreen.x, (int)vHitBoxTwoScreen.y, color);
 	}
+}
+
+
+
+
+void CEsp::AsusWalls()
+{
+	bool AsusDone = false;
+
+	if (Settings::Esp::esp_AsusWalls)
+	{
+		if (!AsusDone)
+		{
+			static auto r_DrawSpecificStaticProp = Interfaces::GetConVar()->FindVar("r_DrawSpecificStaticProp");
+			r_DrawSpecificStaticProp->SetValue(1);
+
+			for (MaterialHandle_t i = Interfaces::MaterialSystem()->FirstMaterial(); i != Interfaces::MaterialSystem()->InvalidMaterial(); i = Interfaces::MaterialSystem()->NextMaterial(i))
+			{
+				IMaterial *pMaterial = Interfaces::MaterialSystem()->GetMaterial(i);
+
+				if (!pMaterial)
+					continue;
+
+				const char* group = pMaterial->GetTextureGroupName();
+				const char* name = pMaterial->GetName();
+
+				double XD = 100;
+				double Opacity = int(Settings::Esp::esp_WallsOpacity);
+				double RealOpacity = Opacity / XD;
+
+				/*if (strstr(group, "StaticProp"))
+				{
+				pMaterial->AlphaModulate(RealOpacity);
+				pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+				}*/
+				if (strstr(group, "World textures"))
+				{
+					pMaterial->AlphaModulate(RealOpacity);
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+				}
+				if (strstr(name, "models/props/de_dust/palace_bigdome"))
+				{
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+				}
+				if (strstr(name, "models/props/de_dust/palace_pillars"))
+				{
+					pMaterial->AlphaModulate(RealOpacity);
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+				}
+
+				if (strstr(group, "Particle textures"))
+				{
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+				}
+				AsusDone = true;
+			}
+
+		}
+
+	}
+	else
+	{
+		if (AsusDone)
+		{
+			for (MaterialHandle_t i = Interfaces::MaterialSystem()->FirstMaterial(); i != Interfaces::MaterialSystem()->InvalidMaterial(); i = Interfaces::MaterialSystem()->NextMaterial(i))
+			{
+				IMaterial *pMaterial = Interfaces::MaterialSystem()->GetMaterial(i);
+
+				if (!pMaterial)
+					continue;
+
+				const char* group = pMaterial->GetTextureGroupName();
+				const char* name = pMaterial->GetName();
+
+				if (strstr(group, "World textures"))
+				{
+
+					pMaterial->AlphaModulate(1);
+				}
+				if (strstr(group, "StaticProp"))
+				{
+					pMaterial->AlphaModulate(1);
+				}
+				if (strstr(name, "models/props/de_dust/palace_bigdome"))
+				{
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, false);
+				}
+				if (strstr(name, "models/props/de_dust/palace_pillars"))
+				{
+
+					pMaterial->AlphaModulate(1);
+				}
+				if (strstr(group, "Particle textures"))
+				{
+					pMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, false);
+				}
+			}
+
+			AsusDone = false;
+		}
+	}
+}
+
+
+
+
+void CEsp::Espwarning()
+{
+
+	if (Settings::Esp::bEspWarnings)
+	{
+		if (Interfaces::Engine()->IsInGame() && Interfaces::Engine()->IsConnected())
+		{
+			std::stringstream text1 = std::stringstream("");
+			std::stringstream text2 = std::stringstream("");
+			CBaseEntity* pLocal = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+			if (!pLocal)
+				return;
+
+			for (int i = 1; i <= Interfaces::Engine()->GetMaxClients(); i++)
+			{
+
+				CBaseEntity* pPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(i);
+
+				if (pPlayer)
+				{
+					if (!pPlayer->IsValid())
+						continue;
+					if (pPlayer->GetTeam() == pLocal->GetTeam() && !Settings::Esp::esp_Team)
+						continue;
+
+					PlayerInfo info;
+					if (!Interfaces::Engine()->GetPlayerInfo(i, &info))
+						continue;
+
+					Vector src, dst, forward;
+					trace_t tr;
+					Ray_t ray;
+					CTraceFilter filter;
+					AngleVectors(pPlayer->GetEyeAngles(), forward);
+					filter.pSkip = pPlayer;
+					src = pPlayer->GetBestEyePos(true);
+					dst = src + (forward * 8192);
+					ray.Init(src, dst);
+					Interfaces::EngineTrace()->TraceRay(ray, MASK_SHOT, &filter, &tr);
+					bool AimingToLocal = (tr.m_pEnt && tr.hitgroup > 0 && tr.hitgroup <= 7);
+					bool CanSeeLocal = pPlayer->IsVisible(pLocal);
+
+					if (AimingToLocal)
+					{
+						text2 << info.m_szPlayerName << " ";
+					}
+					if (CanSeeLocal)
+					{
+						text1 << info.m_szPlayerName << " ";
+					}
+				}
+			}
+
+
+			text2 << "is aiming at you";
+			text1 << "can see You";
+			int screensizeX, screensizeY;
+			Interfaces::Engine()->GetScreenSize(screensizeX, screensizeY);
+			g_pRender->Text(screensizeX / 2, 100, true, true, Color::Red(), text2.str().c_str());
+			g_pRender->Text(screensizeX / 2, 120, true, true, Color::Green(), text1.str().c_str());
+
+		}
+
+	}
+
 }

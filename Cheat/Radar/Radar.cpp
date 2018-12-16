@@ -59,34 +59,39 @@ void CRadar::CalcRadarPoint(Vector vOrigin, int& screenx, int& screeny)
 	ImVec2 DrawPos = ImGui::GetCursorScreenPos();
 	ImVec2 DrawSize = ImGui::GetContentRegionAvail();
 
-	int rad_x = (int)DrawPos.x;
-	int rad_y = (int)DrawPos.y;
+	int Radar_x = (int)DrawPos.x;
+	int Radar_y = (int)DrawPos.y;
 
 	float r_siz_x = DrawSize.x;
 	float r_siz_y = DrawSize.y;
 
-	int x_max = (int)r_siz_x + rad_x - 5;
-	int y_max = (int)r_siz_y + rad_y - 5;
+	int x_max = (int)r_siz_x + Radar_x - 5;
+	int y_max = (int)r_siz_y + Radar_y - 5;
 
-	screenx = rad_x + ((int)r_siz_x / 2 + int(x / range * r_siz_x));
-	screeny = rad_y + ((int)r_siz_y / 2 + int(y / range * r_siz_y));
+	screenx = Radar_x + ((int)r_siz_x / 2 + int(x / range * r_siz_x));
+	screeny = Radar_y + ((int)r_siz_y / 2 + int(y / range * r_siz_y));
 
 	if (screenx > x_max)
 		screenx = x_max;
 
-	if (screenx < rad_x)
-		screenx = rad_x;
+	if (screenx < Radar_x)
+		screenx = Radar_x;
 
 	if (screeny > y_max)
 		screeny = y_max;
 
-	if (screeny < rad_y)
-		screeny = rad_y;
+	if (screeny < Radar_y)
+		screeny = Radar_y;
+}
+
+static void SquareConstraint(ImGuiSizeConstraintCallbackData *data)
+{
+	data->DesiredSize = ImVec2(max(data->DesiredSize.x, data->DesiredSize.y), max(data->DesiredSize.x, data->DesiredSize.y));
 }
 
 void CRadar::OnRenderPlayer()
 {
-	float Alpha = (float)Settings::Radar::rad_Alpha / 255.f;
+
 
 	for (BYTE PlayerIndex = 0; PlayerIndex < g_pPlayers->GetSize(); PlayerIndex++)
 	{
@@ -94,15 +99,6 @@ void CRadar::OnRenderPlayer()
 
 		if (pPlayer && pPlayer->m_pEntity && pPlayer->bUpdate)
 		{
-
-			if (Settings::Radar::rad_InGame && GetKeyState(Settings::Radar::rad_InGameKey))
-			{
-				if (*pPlayer->m_pEntity->IsSpotted() == false)
-				{
-					*pPlayer->m_pEntity->IsSpotted() = true;
-				}
-			}
-
 			if (!Settings::Radar::rad_Active)
 				continue;
 
@@ -150,227 +146,67 @@ void CRadar::OnRenderPlayer()
 
 			ImDrawList* Draw = ImGui::GetWindowDrawList();
 
-			Draw->AddRectFilled(ImVec2((float)screenx, (float)screeny),
-				ImVec2((float)screenx + 5, (float)screeny + 5),
-				ImColor(Color_R, Color_G, Color_B, Alpha));
+
+			Draw->AddCircleFilled(ImVec2((float)screenx, (float)screeny), 5, ImColor(Color_R, Color_G, Color_B, 1.f));
 		}
 	}
 }
+
+void CRadar::OnRenderSounds()
+{
+
+
+	for (size_t i = 0; i < g_pEsp->SoundEsp.Sound.size(); i++)
+	{
+		int screenx = 0;
+		int screeny = 0;
+
+		CalcRadarPoint(g_pEsp->SoundEsp.Sound[i].vOrigin, screenx, screeny);
+
+		ImDrawList* Draw = ImGui::GetWindowDrawList();
+
+		Draw->AddRectFilled(ImVec2((float)screenx, (float)screeny),
+			ImVec2((float)screenx + 5, (float)screeny + 5),
+			ImColor(1.f, 1.f, 1.f, 1.f));
+	}
+}
+
 
 void CRadar::OnRender()
 {
-	if (Settings::Radar::rad_Active && IsLocalAlive())
+	if (Settings::Radar::rad_Active)
 	{
-			float prevAlpha = ImGui::GetStyle().Alpha;
+		float prevAlpha = ImGui::GetStyle().Alpha;
 
-			float Alpha = (float)Settings::Radar::rad_Alpha / 255.f;
+		float Alpha = (float)Settings::Radar::rad_Alpha / 255.f;
 
-			ImGui::GetStyle().Alpha = Alpha;
 
-			if (ImGui::Begin(RADAR_TEXT, &Settings::Radar::rad_Active, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar))
-			{
-				ImDrawList* Draw = ImGui::GetWindowDrawList();
+		ImGui::GetStyle().Alpha = Alpha;
 
-				ImVec2 DrawPos = ImGui::GetCursorScreenPos();
-				ImVec2 DrawSize = ImGui::GetContentRegionAvail();
 
-				Draw->AddLine(
-					ImVec2(DrawPos.x + DrawSize.x / 2.f, DrawPos.y),
-					ImVec2(DrawPos.x + DrawSize.x / 2.f, DrawPos.y + DrawSize.y),
-					ImColor(1.f, 1.f, 1.f, Alpha));
-
-				Draw->AddLine(
-					ImVec2(DrawPos.x, DrawPos.y + DrawSize.y / 2.f),
-					ImVec2(DrawPos.x + DrawSize.x, DrawPos.y + DrawSize.y / 2.f),
-					ImColor(1.f, 1.f, 1.f, Alpha));
-
-				OnRenderPlayer();
-
-				ImGui::End();
-			}
-
-			ImGui::GetStyle().Alpha = prevAlpha;
-		}
-	if (Settings::Radar::rad_InGame && GetKeyState(Settings::Radar::rad_InGameKey))
-	{
-		if (Interfaces::Engine()->IsInGame())
+		if (ImGui::Begin(RADAR_TEXT, &Settings::Radar::rad_Active, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_ShowBorders | ImGuiWindowFlags_NoTitleBar))
 		{
+
+
+			ImDrawList* Draw = ImGui::GetWindowDrawList();
+
+			ImVec2 DrawPos = ImGui::GetCursorScreenPos();
+			ImVec2 DrawSize = ImGui::GetContentRegionAvail();
+
+			ImVec2 winpos = ImGui::GetWindowPos();
+			ImVec2 winsize = ImGui::GetWindowSize();
+
+			Draw->AddLine(ImVec2(winpos.x + winsize.x * 0.5f, winpos.y), ImVec2(winpos.x + winsize.x * 0.5f, winpos.y + winsize.y), ImColor(1, 1, 1, 255), 1.f);
+			Draw->AddLine(ImVec2(winpos.x, winpos.y + winsize.y * 0.5f), ImVec2(winpos.x + winsize.x, winpos.y + winsize.y * 0.5f), ImColor(1, 1, 1, 255), 1.f);
+
+
+
+
 			OnRenderPlayer();
+
+			ImGui::End();
+
 		}
+		ImGui::GetStyle().Alpha = prevAlpha;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

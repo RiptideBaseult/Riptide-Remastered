@@ -31,7 +31,7 @@ int pWeaponItemIndexData[34] =
 	WEAPON_TEC9,
 	// ???????? - 10 - 32
 	WEAPON_AK47,WEAPON_AUG,WEAPON_FAMAS,WEAPON_GALILAR,
-	WEAPON_M249,WEAPON_M4A4,WEAPON_M4A1_SILENCER,WEAPON_MAC10,
+	WEAPON_M249,WEAPON_M4A1,WEAPON_M4A1_SILENCER,WEAPON_MAC10,
 	WEAPON_P90,WEAPON_MP5,WEAPON_UMP45,WEAPON_XM1014,WEAPON_BIZON,
 	WEAPON_MAG7,WEAPON_NEGEV,WEAPON_SAWEDOFF,
 	WEAPON_MP7,WEAPON_MP9,WEAPON_NOVA,WEAPON_SG553,
@@ -40,7 +40,7 @@ int pWeaponItemIndexData[34] =
 	WEAPON_AWP,WEAPON_SSG08
 };
 
-	char* pKnifeData[14] =
+char* pKnifeData[14] =
 {
 	"m9_bayonet","knife_flip","knife_gut","knife_karambit" ,"knife_m9_bayonet",
 	"knife_tactical","knife_falchion","knife_survival_bowie","knife_butterfly","knife_push",
@@ -118,6 +118,87 @@ GlovesSkins_s GlovesSkin_Array[49] =
 RecvVarProxyFn fnSequenceProxyFn = NULL;
 
 using namespace Client;
+
+Stick_t* Stick = new Stick_t[520];
+DWORD dwEconItemInterfaceWrapper = 0;
+int SafeWeaponID()
+{
+	CBaseEntity* me = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+	if (!me)
+		return 0;
+	CBaseWeapon* weap = me->GetBaseWeapon();
+	if (!weap)
+		return 0;
+	int nWeaponIndex = *weap->GeteAttributableItem()->GetItemDefinitionIndex();
+	return nWeaponIndex;
+}
+typedef float(__thiscall* GetStickerAttributeBySlotIndexFloatFn)(void*, int, EStickerAttributeType, float);
+GetStickerAttributeBySlotIndexFloatFn oGetStickerAttributeBySlotIndexFloat;
+float __fastcall Hooked_GetStickerAttributeBySlotIndexFloat(void* thisptr, void* edx, int iSlot, EStickerAttributeType iAttribute, float flUnknown)
+{
+	auto pItem = reinterpret_cast<CBaseAttributableItem*>(uintptr_t(thisptr) - dwEconItemInterfaceWrapper);
+	if (!pItem)
+		return oGetStickerAttributeBySlotIndexFloat(thisptr, iSlot, iAttribute, flUnknown);
+	int iID = *pItem->GetItemDefinitionIndex();
+	if (!Stick[iID].StickersEnabled)
+		return oGetStickerAttributeBySlotIndexFloat(thisptr, iSlot, iAttribute, flUnknown);
+	switch (iAttribute)
+	{
+	case EStickerAttributeType::Wear:
+		return min(1.f, Stick[iID].Stickers[iSlot].flWear + 0.0000000001f);
+	case EStickerAttributeType::Scale:
+		return Stick[iID].Stickers[iSlot].flScale;
+	case EStickerAttributeType::Rotation:
+		return Stick[iID].Stickers[iSlot].iRotation;
+	default:
+		break;
+	}
+	return oGetStickerAttributeBySlotIndexFloat(thisptr, iSlot, iAttribute, flUnknown);
+}
+typedef UINT(__thiscall* GetStickerAttributeBySlotIndexIntFn)(void*, int, EStickerAttributeType, float);
+GetStickerAttributeBySlotIndexIntFn oGetStickerAttributeBySlotIndexInt;
+UINT __fastcall Hooked_GetStickerAttributeBySlotIndexInt(void* thisptr, void* edx, int iSlot, EStickerAttributeType iAttribute, UINT iUnknown)
+{
+	auto pItem = reinterpret_cast<CBaseAttributableItem*>(uintptr_t(thisptr) - dwEconItemInterfaceWrapper);
+	if (!pItem)
+		return oGetStickerAttributeBySlotIndexInt(thisptr, iSlot, iAttribute, iUnknown);
+	int iID = *pItem->GetItemDefinitionIndex();
+	if (!Stick[iID].StickersEnabled)
+		return oGetStickerAttributeBySlotIndexInt(thisptr, iSlot, iAttribute, iUnknown);
+	return Stick[iID].Stickers[iSlot].iID;
+	//return Parser::Stickers.List[g_Weapons[iID].Stickers[iSlot].iID].iID; //
+}
+bool IsCodePtr(void* ptr)
+{
+	constexpr const DWORD protect_flags = PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+	MEMORY_BASIC_INFORMATION out;
+	VirtualQuery(ptr, &out, sizeof out);
+	return out.Type
+		&& !(out.Protect & (PAGE_GUARD | PAGE_NOACCESS))
+		&& out.Protect & protect_flags;
+}
+void ApplyStickerHooks(CBaseAttributableItem* pItem)
+{
+	if (!dwEconItemInterfaceWrapper)
+		dwEconItemInterfaceWrapper = 0x2DB0 + 0xC;
+	void**& vmt = *reinterpret_cast<void***>(uintptr_t(pItem) + dwEconItemInterfaceWrapper);
+	static void** hooked_vmt = nullptr;
+	if (!hooked_vmt)
+	{
+		size_t size = 0;
+		while (IsCodePtr(vmt[size]))
+			++size;
+		hooked_vmt = new void*[size];
+		memcpy(hooked_vmt, vmt, size * sizeof(void*));
+		oGetStickerAttributeBySlotIndexFloat = (GetStickerAttributeBySlotIndexFloatFn)hooked_vmt[4];
+		hooked_vmt[4] = reinterpret_cast<void*>(&Hooked_GetStickerAttributeBySlotIndexFloat);
+		oGetStickerAttributeBySlotIndexInt = (GetStickerAttributeBySlotIndexIntFn)hooked_vmt[5];
+		hooked_vmt[5] = reinterpret_cast<void*>(&Hooked_GetStickerAttributeBySlotIndexInt);
+	}
+	vmt = hooked_vmt;
+}
+
+
 
 int GetWeaponSkinIndexFromPaintKit(int iPaintKit)
 {

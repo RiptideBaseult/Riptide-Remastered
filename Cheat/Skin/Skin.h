@@ -6,11 +6,16 @@
 
 #include "DynSkin.h"
 
+
+extern class Stick_t* Stick;
+
 namespace Engine
 {
 	class CBaseAttributableItem;
 	class CBaseEntity;
 }
+
+#define STICKERS_COUNT 5
 
 using namespace Engine;
 
@@ -44,13 +49,42 @@ struct GlovesSkins_s
 	const char* szModel;
 };
 
+enum class EStickerAttributeType
+{
+	Index,
+	Wear,
+	Scale,
+	Rotation
+};
+
+
+extern int SafeWeaponID();
+extern class Stick_t* Stick;
+#define INVALID_EHANDLE_INDEX 0xFFFFFFFF
+#define STICKERS_COUNT 5
+class Sticker_t
+{
+public:
+	int iID = 0;
+	float flWear = 0.f;
+	float flScale = 1.f;
+	int iRotation = 0;
+};
+
+class Stick_t
+{
+public:
+	bool StickersEnabled = false;
+	Sticker_t Stickers[STICKERS_COUNT];
+};
+
 extern WeaponSkins_s WeaponSkins[34];
 extern KnifeSkins_s KnifeSkins[14];
 extern GlovesSkins_s GlovesSkin_Array[49];
 
-extern unordered_map<int , EconomyItemCfg> g_SkinChangerCfg;
-extern unordered_map<int , const char*> g_ViewModelCfg;
-extern unordered_map<const char* , const char*> g_KillIconCfg;
+extern unordered_map<int, EconomyItemCfg> g_SkinChangerCfg;
+extern unordered_map<int, const char*> g_ViewModelCfg;
+extern unordered_map<const char*, const char*> g_KillIconCfg;
 
 extern char* pWeaponData[34];
 extern int pWeaponItemIndexData[34];
@@ -59,14 +93,14 @@ extern char* pKnifeData[14];
 #define WEAPON_DATA_SIZE ( sizeof( pWeaponData ) / sizeof( *pWeaponData ) )
 #define KNIFE_DATA_SIZE ( sizeof( pKnifeData ) / sizeof( *pKnifeData ) )
 
-int GetWeaponSkinIndexFromPaintKit( int iPaintKit );
-int GetKnifeSkinIndexFromPaintKit( int iPaintKit , bool tt );
+int GetWeaponSkinIndexFromPaintKit(int iPaintKit);
+int GetKnifeSkinIndexFromPaintKit(int iPaintKit, bool tt);
 
 class CSkin
 {
 public:
 	//[swap_lines]
-	void OnEvents( IGameEvent* pEvent );
+	void OnEvents(IGameEvent* pEvent);
 
 	void SetSkinConfig();
 	void SetModelConfig();
@@ -74,16 +108,16 @@ public:
 
 	void InitalizeSkins();
 
-	bool ApplyCustomSkin( CBaseAttributableItem* pWeapon , int nWeaponIndex );
-	bool ApplyCustomModel( CBaseEntity* pLocal , CBaseAttributableItem* pWeapon );
-	bool ApplyCustomKillIcon( IGameEvent* pEvent );
-//[/swap_lines]
+	bool ApplyCustomSkin(CBaseAttributableItem* pWeapon, int nWeaponIndex);
+	bool ApplyCustomModel(CBaseEntity* pLocal, CBaseAttributableItem* pWeapon);
+	bool ApplyCustomKillIcon(IGameEvent* pEvent);
+	//[/swap_lines]
 };
 
-void Skin_OnFrameStageNotify( ClientFrameStage_t Stage );
-void Gloves_OnFrameStageNotify( ClientFrameStage_t Stage );
+void Skin_OnFrameStageNotify(ClientFrameStage_t Stage);
+void Gloves_OnFrameStageNotify(ClientFrameStage_t Stage);
 
-void Hook_SetViewModelSequence( const CRecvProxyData *pDataConst , void *pStruct , void *pOut );
+void Hook_SetViewModelSequence(const CRecvProxyData *pDataConst, void *pStruct, void *pOut);
 
 // охярнкерш
 //[enc_string_enable /]

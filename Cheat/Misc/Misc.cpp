@@ -1,17 +1,11 @@
-﻿#include "Misc.h"
+#include "Misc.h"
+
 
 using namespace Client;
 //[junk_enable /]
 //[enc_string_enable /]
 void CMisc::OnRender()
 {
-	if (Settings::Misc::misc_Punch)
-	{
-		int punch_x = (int)g_vCenterScreen.x + (int)g_pPlayers->GetLocal()->vAimPunch.y * 10;
-		int punch_y = (int)g_vCenterScreen.y + (int)g_pPlayers->GetLocal()->vAimPunch.x * 10;
-
-		g_pRender->DrawFillBox(punch_x - 1, punch_y - 1, 3, 3, Color::Green());
-	}
 	if (Settings::Misc::misc_Punch2)
 	{
 		CBaseEntity* localplayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
@@ -37,46 +31,64 @@ void CMisc::OnRender()
 	}
 }
 
-void CMisc::OnCreateMove(CUserCmd* pCmd)
+
+
+
+void CMisc::OnEvents(IGameEvent* pEvent)
+{
+	if (Settings::Misc::Killmessage)
+	{
+		if (!strcmp(pEvent->GetName(), "player_death"))
+		{
+			int attacker = Interfaces::Engine()->GetPlayerForUserID(pEvent->GetInt("attacker"));
+			int userid = Interfaces::Engine()->GetPlayerForUserID(pEvent->GetInt("userid"));
+			if (attacker != userid)
+			{
+				if (attacker == Interfaces::Engine()->GetLocalPlayer())
+				{
+					Interfaces::Engine()->ExecuteClientCmd("say HAHHAHA.You Noob!I kill you!");
+					if (attacker = userid)
+					{
+						Interfaces::Engine()->ExecuteClientCmd("say HAHHAHA.You Noob!I kill you!");
+					}
+				}
+			}
+		}
+	}
+}
+
+void CMisc::OnCreateMove(CUserCmd* cmd)
 {
 	CBaseEntity* localplayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
 
-	bool in_water = g_pPlayers->GetLocal()->m_pEntity->m_nWaterLevel() >= 2;
-	bool on_ladder = g_pPlayers->GetLocal()->m_pEntity->movetype() == MOVETYPE_LADDER;
-	bool noclip = g_pPlayers->GetLocal()->m_pEntity->movetype() == MOVETYPE_NOCLIP;
-	bool spectate = g_pPlayers->GetLocal()->m_pEntity->movetype() == MOVETYPE_OBSERVER;
+	static bool gravityTurnedOn = false;
 
-	ConVar* lefthandknife = Interfaces::GetConVar()->FindVar("cl_righthand");
-	if (Settings::Misc::misc_LeftHandKnife)
-	{
-		if (Settings::Misc::misc_LeftHandKnife && Interfaces::Engine()->GetLocalPlayer() && g_pPlayers->GetLocal()->WeaponName.find("Knife") != string::npos && Interfaces::Engine()->IsInGame())
-		{
-			lefthandknife->SetValue(0);
-		}
-		else
-		{
-			lefthandknife->SetValue(1);
-		}
+	if (Settings::Misc::misc_ragdoll_gravity) {
+		ConVar* Gravity = Interfaces::GetConVar()->FindVar("cl_ragdoll_gravity");
+		Gravity->SetValue(Settings::Misc::misc_ragdoll_gravity_amount);
+		gravityTurnedOn = true;
 	}
-	else
-	{
-		//off 
+	else {
+		if (gravityTurnedOn == true) {
+			ConVar* Gravity = Interfaces::GetConVar()->FindVar("cl_ragdoll_gravity");
+			Gravity->SetValue(800.f);
+			gravityTurnedOn = false;
+		}
 	}
 
-	if (Settings::Misc::misc_RightHandKnife)
-	{
-		if (Settings::Misc::misc_RightHandKnife && Interfaces::Engine()->GetLocalPlayer() && g_pPlayers->GetLocal()->WeaponName.find("Knife") != string::npos && Interfaces::Engine()->IsInGame())
-		{
-			lefthandknife->SetValue(1);
-		}
-		else
-		{
-			lefthandknife->SetValue(0);
-		}
+	static bool pushscaleTurnedOn = false;
+
+	if (Settings::Misc::misc_pushscale) {
+		ConVar* Pushscale = Interfaces::GetConVar()->FindVar("phys_pushscale");
+		Pushscale->SetValue(Settings::Misc::misc_pushscale_amount);
+		pushscaleTurnedOn = true;
 	}
-	else
-	{
-		//off 
+	else {
+		if (pushscaleTurnedOn == true) {
+			ConVar* Pushscale = Interfaces::GetConVar()->FindVar("phys_pushscale");
+			Pushscale->SetValue(600.f);
+			pushscaleTurnedOn = false;
+		}
 	}
 
 	if (Settings::Misc::misc_Bhop)
@@ -92,10 +104,10 @@ void CMisc::OnCreateMove(CUserCmd* pCmd)
 
 		if (!bLastJumped && bShouldFake)
 		{
-			bShouldFake = false;
-			pCmd->buttons |= IN_JUMP;
+			bShouldFake = false;             
+			cmd->buttons |= IN_JUMP;
 		}
-		else if (pCmd->buttons & IN_JUMP)
+		else if (cmd->buttons & IN_JUMP)
 		{
 			if (g_pPlayers->GetLocal()->iFlags & FL_ONGROUND)
 			{
@@ -104,7 +116,7 @@ void CMisc::OnCreateMove(CUserCmd* pCmd)
 			}
 			else
 			{
-				pCmd->buttons &= ~IN_JUMP;
+				cmd->buttons &= ~IN_JUMP;
 				bLastJumped = false;
 			}
 		}
@@ -115,85 +127,85 @@ void CMisc::OnCreateMove(CUserCmd* pCmd)
 		}
 	}
 
-/*	if (Settings::Misc::misc_Bhop)
+	if (Settings::Misc::misc_Telehop)
 	{
-		static bool bLastJumped = false;
-		static bool bShouldFake = false;
+		static bool bDirection = true;
+		static bool takethatshitoff = false;
+		int iFlags = g_pPlayers->GetLocal()->iFlags;
 
-		if (!localplayer)
-			return;
-
-		if (localplayer->GetMoveType() == MOVETYPE_LADDER || localplayer->GetMoveType() == MOVETYPE_NOCLIP)
-			return;
-
-		if (!bLastJumped && bShouldFake)
+		if ((cmd->buttons & IN_JUMP) && (iFlags & FL_ONGROUND))
 		{
-			bShouldFake = false;
-			pCmd->buttons |= IN_JUMP;
+			cmd->forwardmove = 450;
 		}
-		else if (pCmd->buttons & IN_JUMP)
-		{
-			if (g_pPlayers->GetLocal()->iFlags & FL_ONGROUND)
+
+		if ((cmd->buttons & IN_JUMP) || !(iFlags &
+			FL_ONGROUND)) {
+			if (bDirection)
 			{
-				bLastJumped = true;
-				bShouldFake = true;
+				cmd->sidemove = -450.f;
+				bDirection = false;
 			}
 			else
 			{
-				pCmd->buttons &= ~IN_JUMP;
-				bLastJumped = false;
+				cmd->sidemove = +450.f;
+				bDirection = true;
 			}
 		}
+	}
+
+
+
+	if (Settings::Misc::misc_spamregular)
+		ChatSpamRegular();
+
+	if (Settings::Misc::misc_spamrandom)
+		ChatSpamRandom();
+
+	if (Settings::Misc::misc_Clan > 0)
+		ClanTag();
+
+	if (Settings::Misc::misc_AutoStrafe == 1 && !(g_pPlayers->GetLocal()->iFlags & FL_ONGROUND))
+	{
+		if (cmd->mousedx > 1 || cmd->mousedx < -1)
+		{
+			cmd->sidemove = cmd->mousedx < 0.f ? -400.f : 400.f;
+		}
+	}
+	else if (Settings::Misc::misc_AutoStrafe == 2 && !(g_pPlayers->GetLocal()->iFlags & FL_ONGROUND))
+	{
+			bool bKeysPressed = true;
+			if (GetKeyState(0x41) || GetKeyState(0x57) || GetKeyState(0x53) || GetKeyState(0x44)) bKeysPressed = false;
+
+			if ((GetAsyncKeyState(VK_SPACE) && !(localplayer->GetFlags() & FL_ONGROUND)) && bKeysPressed)
+			{
+				if (cmd->mousedx > 1 || cmd->mousedx < -1) {
+					cmd->sidemove = cmd->mousedx < 0.f ? -450.f : 450.f;
+				}
+				else {
+					cmd->forwardmove = (1800.f * 4.f) / localplayer->GetVelocity().Length2D();
+					cmd->sidemove = (cmd->command_number % 2) == 0 ? -450.f : 450.f;
+					if (cmd->forwardmove > 450.f)
+						cmd->forwardmove = 450.f;
+				}
+			}
+		
+	}
+
+	if (Settings::Misc::misc_AntiAfk)
+	{
+		static bool Jitter;
+		Jitter = !Jitter;
+		if (Jitter)
+			cmd->sidemove += 450;
 		else
-		{
-			bLastJumped = false;
-			bShouldFake = false;
-		}
-	}
-/*	if (Settings::Misc::misc_EdgeJump)
-	{
-		if (localplayer->GetMoveType() == MOVETYPE_LADDER || localplayer->GetMoveType() == MOVETYPE_NOCLIP)
-			return;
+			cmd->sidemove = -450;
 
-		switch (CurrentState)
-		{
-		case STATE_BEGIN:
-			if (g_pPlayers->GetLocal()->iFlags & FL_ONGROUND && !(localplayer->GetFlags() & FL_ONGROUND) && !(pCmd->buttons & IN_JUMP))
-			{
-				pCmd->buttons |= IN_JUMP;
+		if (!Jitter)
+			cmd->forwardmove = -450;
+		else
+			cmd->forwardmove = +450;
 
-				CurrentState = STATE_DUCKING;
-			}
-			break;
-		case STATE_DUCKING:
-			if (localplayer->GetFlags() & FL_ONGROUND)
-				CurrentState = STATE_BEGIN;
-			else
-				pCmd->buttons |= IN_DUCK;
-
-			break;
-		}
-	}
-*/
-	if (Settings::Misc::misc_AutoStrafe && !(g_pPlayers->GetLocal()->iFlags & FL_ONGROUND) && !on_ladder && !noclip && !spectate && !in_water)
-	{
-		static float float1;
-		static float float2;
-
-		if (!(g_pPlayers->GetLocal()->iFlags & FL_ONGROUND))
-		{
-			float2 = CSX::Utils::RandomIntRange(-440, -450);
-			float1 = CSX::Utils::RandomIntRange(440, 450);
-		}
-
-		if (pCmd->mousedx < 0)
-		{
-			pCmd->sidemove = float2;
-		}
-		else if (pCmd->mousedx > 0)
-		{
-			pCmd->sidemove = float1;
-		}
+		cmd->buttons += IN_MOVELEFT;
 	}
 
 	ConVar* skybox = Interfaces::GetConVar()->FindVar("sv_skyname");
@@ -212,45 +224,41 @@ void CMisc::OnCreateMove(CUserCmd* pCmd)
 		snow->SetValue(0);
 	}
 
-	if (Settings::Misc::misc_Duck)
+	
+
+	
+
+
+	if (Settings::Misc::misc_radiospam)
 	{
-		pCmd->buttons |= IN_BULLRUSH;
-	}
+		const char* radioCommands[] = {
+			"coverme",
+			"takepoint",
+			"holdpos",
+			"regroup",
+			"followme",
+			"takingfire",
+			"go",
+			"fallback",
+			"sticktog",
+			"report",
+			"roger",
+			"enemyspot",
+			"needbackup",
+			"sectorclear",
+			"inposition",
+			"reportingin",
+			"getout",
+			"negative",
+			"enemydown",
+		};
 
-	if (Settings::Misc::misc_antiafk)
+		Interfaces::Engine()->ClientCmd_Unrestricted2(radioCommands[std::rand() % ARRAYSIZE(radioCommands)]);
+	}
+	if (Settings::Misc::misc_NoFlash)
 	{
-		static bool Jitter;
-		Jitter = !Jitter;
-		if (Jitter)
-			pCmd->sidemove += 450;
-		else
-			pCmd->sidemove = -450;
-
-		if (!Jitter)
-			pCmd->forwardmove = -450;
-		else
-			pCmd->forwardmove = +450;
-
-		pCmd->buttons += IN_MOVELEFT;
+		localplayer->ModulateFlashAlpha() = 0.f;
 	}
-
-	ConVar* postprocess = Interfaces::GetConVar()->FindVar("mat_postprocess_enable");
-
-	if (Settings::Misc::misc_EPostprocess)
-	{
-		if (Interfaces::Engine()->IsInGame())
-		{
-			postprocess->SetValue(0);
-		}
-	}
-	else
-	{
-		if (Interfaces::Engine()->IsInGame())
-		{
-			postprocess->SetValue(1);
-		}
-	}
-
 }
 
 std::vector<const char*> smoke_materials =
@@ -263,41 +271,9 @@ std::vector<const char*> smoke_materials =
 
 void CMisc::OnDrawModelExecute()
 {
-	static bool NoFlashReset = false;
 	static bool NoSmoke = false;
+	static bool WireFrameSmoke = false;
 
-	if (Settings::Misc::misc_NoFlash && !NoFlashReset)
-	{
-		IMaterial* flash = Interfaces::MaterialSystem()->FindMaterial(
-			"effects\\flashbang", TEXTURE_GROUP_CLIENT_EFFECTS);
-
-		IMaterial* flashWhite = Interfaces::MaterialSystem()->FindMaterial("effects\\flashbang_white",
-			TEXTURE_GROUP_CLIENT_EFFECTS);
-
-		if (flash && flashWhite)
-		{
-			flash->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
-			flashWhite->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
-
-			NoFlashReset = true;
-		}
-	}
-	else if (!Settings::Misc::misc_NoFlash && NoFlashReset)
-	{
-		IMaterial* flash = Interfaces::MaterialSystem()->FindMaterial(
-			"effects\\flashbang", TEXTURE_GROUP_CLIENT_EFFECTS);
-
-		IMaterial* flashWhite = Interfaces::MaterialSystem()->FindMaterial("effects\\flashbang_white",
-			TEXTURE_GROUP_CLIENT_EFFECTS);
-
-		if (flash && flashWhite)
-		{
-			flash->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, false);
-			flashWhite->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, false);
-
-			NoFlashReset = false;
-		}
-	}
 	if (Settings::Misc::misc_NoSmoke)
 	{
 		IMaterial* vistasmokev1_smokegrenade = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_smokegrenade", TEXTURE_GROUP_CLIENT_EFFECTS);
@@ -339,9 +315,54 @@ void CMisc::OnDrawModelExecute()
 
 		}
 	}
+
+	if (Settings::Misc::misc_wireframesmoke)
+
+	{
+		IMaterial* vistasmokev1_smokegrenade = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_smokegrenade", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		IMaterial* vistasmokev1_emods = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_emods", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		IMaterial* vistasmokev1_emods_impactdust = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_emods_impactdust", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		IMaterial* vistasmokev1_fire = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_fire", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		if (vistasmokev1_smokegrenade && vistasmokev1_emods && vistasmokev1_emods_impactdust && vistasmokev1_fire)
+		{
+			vistasmokev1_smokegrenade->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, true);
+			vistasmokev1_emods->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, true);
+			vistasmokev1_emods_impactdust->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, true);
+			vistasmokev1_fire->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, true);
+
+			WireFrameSmoke = true;
+		}
+	}
+
+	else if (!Settings::Misc::misc_wireframesmoke)
+
+	{
+		IMaterial* vistasmokev1_smokegrenade = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_smokegrenade", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		IMaterial* vistasmokev1_emods = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_emods", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		IMaterial* vistasmokev1_emods_impactdust = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_emods_impactdust", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		IMaterial* vistasmokev1_fire = Interfaces::MaterialSystem()->FindMaterial("particle/vistasmokev1/vistasmokev1_fire", TEXTURE_GROUP_CLIENT_EFFECTS);
+
+		if (vistasmokev1_smokegrenade && vistasmokev1_emods && vistasmokev1_emods_impactdust && vistasmokev1_fire)
+		{
+			vistasmokev1_smokegrenade->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, false);
+			vistasmokev1_emods->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, false);
+			vistasmokev1_emods_impactdust->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, false);
+			vistasmokev1_fire->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, false);
+
+			WireFrameSmoke = false;
+		}
+	}
+
 }
 
-/*void CMisc::OnPlaySound(const char* pszSoundName)
+void CMisc::OnPlaySound(const char* pszSoundName)
 {
 	if (Settings::Misc::misc_AutoAccept && !strcmp(pszSoundName, "!UI/competitive_accept_beep.wav"))
 	{
@@ -353,6 +374,7 @@ void CMisc::OnDrawModelExecute()
 		{
 			IsReadyCallBack = (IsReadyCallBackFn)(
 				CSX::Memory::FindPattern(CLIENT_DLL, "55 8B EC 83 E4 F8 83 EC 08 56 8B 35 ? ? ? ? 57 83 BE", 0));
+
 #if ENABLE_DEBUG_FILE == 1
 			CSX::Log::Add("::IsReadyCallBack = %X", IsReadyCallBack);
 #endif
@@ -363,12 +385,13 @@ void CMisc::OnDrawModelExecute()
 			IsReadyCallBack();
 		}
 	}
-}*/
-/*
+}
+
+
+
 void CMisc::OnOverrideView(CViewSetup * pSetup)
 {
-	//if (Settings::Misc::misc_FovChanger && !Interfaces::Engine()->IsTakingScreenshot()) - screenshot shit
-	if (Settings::Misc::misc_FovChanger)
+	if (Settings::Misc::misc_FovChanger && !Interfaces::Engine()->IsTakingScreenshot())
 	{
 		CBaseEntity* pPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
 
@@ -393,8 +416,7 @@ void CMisc::OnOverrideView(CViewSetup * pSetup)
 
 void CMisc::OnGetViewModelFOV(float& fov)
 {
-	// if (Settings::Misc::misc_FovChanger && !Interfaces::Engine()->IsTakingScreenshot()) - screenshot shit
-	if (Settings::Misc::misc_FovChanger)
+	if (Settings::Misc::misc_FovChanger && !Interfaces::Engine()->IsTakingScreenshot())
 	{
 		CBaseEntity* pPlayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
 
@@ -413,7 +435,45 @@ void CMisc::OnGetViewModelFOV(float& fov)
 		fov = (float)Settings::Misc::misc_FovModelView;
 	}
 }
-*/
+
+void SetThirdPersonAngles(QAngle angles)
+{
+	CBaseEntity* local = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+
+	static int deadflag = Offset::Entity::deadflag;
+	*(QAngle*)((uintptr_t)local->GetBaseEntity() + deadflag + 0x4) = angles;
+	Interfaces::Input()->m_fCameraInThirdPerson = true;
+}
+
+void CMisc::FrameStageNotify(ClientFrameStage_t Stage)
+{
+	CBaseEntity* localplayer = (CBaseEntity*)Interfaces::EntityList()->GetClientEntity(Interfaces::Engine()->GetLocalPlayer());
+
+	if (Interfaces::Engine()->IsInGame() && localplayer && Stage == ClientFrameStage_t::FRAME_RENDER_START)
+	{
+		static QAngle vecAngles;
+		Interfaces::Engine()->GetViewAngles(vecAngles);
+
+		if (Settings::Misc::misc_ThirdPerson && !localplayer->IsDead())
+		{
+			if (!Interfaces::Input()->m_fCameraInThirdPerson)
+				Interfaces::Input()->m_fCameraInThirdPerson = true;
+
+			Interfaces::Input()->m_vecCameraOffset = QAngle(vecAngles.x, vecAngles.y, Settings::Misc::misc_ThirdPersonRange);
+
+			SetThirdPersonAngles(Settings::Misc::qLastTickAngle);
+		}
+		else
+		{
+			if (Interfaces::Input()->m_fCameraInThirdPerson || localplayer->GetIsScoped())
+			{
+				Interfaces::Input()->m_fCameraInThirdPerson = false;
+				Interfaces::Input()->m_vecCameraOffset = QAngle(vecAngles.x, vecAngles.y, 0);
+			}
+		}
+	}
+}
+
 vector<int> CMisc::GetObservervators(int playerId)
 {
 	vector<int> SpectatorList;
@@ -459,7 +519,7 @@ vector<int> CMisc::GetObservervators(int playerId)
 
 void CMisc::OnRenderSpectatorList()
 {
-	if (Settings::Misc::misc_Spectators && Interfaces::Engine()->IsInGame())
+	if (Settings::Misc::misc_Spectators)
 	{
 		int DrawIndex = 1;
 
@@ -495,207 +555,32 @@ void CMisc::OnRenderSpectatorList()
 						break;
 					case ObserverMode_t::OBS_MODE_CHASE:
 						Name.append(" - 3rd person");
-						PlayerObsColor = Color::White();
+						PlayerObsColor = Color::Aqua();
 						break;
 					case ObserverMode_t::OBS_MODE_ROAMING:
 						Name.append(" - Free look");
-						PlayerObsColor = Color::White();
+						PlayerObsColor = Color::Red();
 						break;
 					case ObserverMode_t::OBS_MODE_DEATHCAM:
 						Name.append(" - Deathcam");
-						PlayerObsColor = Color::White();
+						PlayerObsColor = Color::Yellow();
 						break;
 					case ObserverMode_t::OBS_MODE_FREEZECAM:
 						Name.append(" - Freezecam");
-						PlayerObsColor = Color::White();
+						PlayerObsColor = Color::LimeGreen();
 						break;
 					case ObserverMode_t::OBS_MODE_FIXED:
 						Name.append(" - Fixed");
-						PlayerObsColor = Color::White();
+						PlayerObsColor = Color::Orange();
 						break;
 					default:
 						break;
 					}
 					//[junk_enable /]
-					g_pRender->Text(15, 502 + (DrawIndex * 13), false, true, PlayerObsColor, "%s", Name.c_str());
+					g_pRender->Text(iScreenWidth - 300, 300 + (DrawIndex * 13), false, true, PlayerObsColor, "%s", Name.c_str());
 					DrawIndex++;
 				}
 			}
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

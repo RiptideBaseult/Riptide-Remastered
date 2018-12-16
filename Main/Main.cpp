@@ -15,26 +15,15 @@ DWORD WINAPI CheatEntry(LPVOID lpThreadParameter)
 
 	return 0;
 }
-
+bool threadLoop;
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
 {
 	if (fdwReason == DLL_PROCESS_ATTACH)
 	{
-		Beep(659.26, 200);
-		Beep(659.26, 200);
-		Sleep(200);
-		Beep(659.26, 200);
-		Sleep(100);
-		Beep(523.26, 200);
-		Beep(659.26, 200);
-		Sleep(200);
-		Beep(783.98, 200);
-		Sleep(400);
-		Beep(391.99, 200); 
-
 		DisableThreadLibraryCalls(hinstDLL);
 
 		Client::BaseDir = CSX::Utils::GetHackWorkingDirectory().c_str();
+
 
 		if (Client::BaseDir.size() < 1)
 		{
@@ -57,182 +46,17 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
 #endif
 
 		CreateThread(0, 0, CheatEntry, hinstDLL, 0, 0);
+
+	
+			
+
 	}
 	else if (fdwReason == DLL_PROCESS_DETACH)
 	{
+		
 		Engine::Shutdown();
+		
 	}
 
 	return TRUE;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

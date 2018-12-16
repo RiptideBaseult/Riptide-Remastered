@@ -9,6 +9,24 @@ namespace Engine
 		return GetMethod<GetWeaponIDFn>(this, 458)(this);
 	}
 
+	float CBaseWeapon::GetSpread()
+	{
+		typedef int(__thiscall* GetSpread)(void*);
+		return GetMethod<GetSpread>(this, 440)(this);
+	}
+
+	CWeaponInfo* CBaseWeapon::GetCSWpnData()
+	{
+		typedef CWeaponInfo*(__thiscall* OriginalFn)(void*);
+		return GetMethod<OriginalFn>(this, 448)(this);
+
+	}
+
+	float CBaseWeapon::GetInaccuracy()
+	{
+		return GetMethod<float(__thiscall*)(void*)>(this, 471)(this);
+	}
+
 	int	CBaseWeapon::GetWeaponType()
 	{
 		typedef int(__thiscall* GetWeaponTypeFn)(void*);

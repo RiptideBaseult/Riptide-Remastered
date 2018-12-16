@@ -9,7 +9,6 @@ namespace Engine
 	{
 		m_pFont = nullptr;
 		m_pIconz = nullptr;
-		m_pLog = nullptr;
 		m_pDevice = pDevice;
 
 		m_pStateBlockDraw = nullptr;
@@ -29,9 +28,6 @@ namespace Engine
 
 		if (m_pIconz)
 			m_pIconz = nullptr;
-
-		if (m_pLog)
-			m_pLog = nullptr;
 
 		if (m_pStateBlockDraw)
 			m_pStateBlockDraw = nullptr;
@@ -53,6 +49,7 @@ namespace Engine
 				return false;
 		}
 
+
 		if (!m_pIconz)
 		{
 			HRESULT hFontRes = D3DXCreateFontA(m_pDevice, 17, 0, FW_HEAVY, 0, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FW_DONTCARE, "AstriumWep", &m_pIconz);
@@ -61,13 +58,8 @@ namespace Engine
 				return false;
 		}
 
-		if (!m_pLog)
-		{
-			HRESULT lFont = D3DXCreateFontA(m_pDevice, 12, 0, 666, 0, FALSE, RUSSIAN_CHARSET, OUT_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FW_DONTCARE, "BRLNSB", &m_pLog); //Agencyb
-			if (lFont != D3D_OK)
-				return false;
-		}
 
+		return true;
 
 		return true;
 	}
@@ -79,9 +71,6 @@ namespace Engine
 
 		if (m_pIconz)
 			m_pIconz->OnLostDevice();
-
-		if (m_pLog)
-			m_pLog->OnLostDevice();
 
 		if (m_pStateBlockDraw)
 			m_pStateBlockDraw = nullptr;
@@ -97,9 +86,6 @@ namespace Engine
 
 		if (m_pIconz)
 			m_pIconz->OnResetDevice();
-
-		if (m_pLog)
-			m_pLog->OnResetDevice();
 
 		if (!CreateObject())
 		{
@@ -134,7 +120,6 @@ namespace Engine
 			m_pStateBlockText->Release();
 	}
 
-
 	void CRender::DrawLine(int x1, int y1, int x2, int y2, Color color)
 	{
 		DWORD dxLineColor = D3DCOLOR_RGBA(color.r(), color.g(), color.b(), color.a());
@@ -149,25 +134,12 @@ namespace Engine
 		m_pDevice->DrawPrimitiveUP(D3DPT_LINELIST, 1, &D3DTLV, sizeof(D3DTLVERTEX));
 	}
 
-	void CRender::Circle(float x, float y, float r, float s, Color color)
-	{
-		float Step = M_PI * 2.0 / s;
-		for (float a = 0; a < (M_PI * 2.0); a += Step)
-		{
-			float x1 = r * cos(a) + x;
-			float y1 = r * sin(a) + y;
-			float x2 = r * cos(a + Step) + x;
-			float y2 = r * sin(a + Step) + y;
-			DrawLine(x1, y1, x2, y2, color);
-		}
-	}
-
 	void CRender::Line(Vector2D start_pos, Vector2D end_pos, Color col)
 	{
 		DrawLine(start_pos.x, start_pos.y, end_pos.x, end_pos.y, col);
 	}
 
-	void CRender::DrawCircle(Vector2D position, float points, float radius, Color color)
+	void CRender::Circle(Vector2D position, float points, float radius, Color color)
 	{
 		float step = (float)M_PI * 2.0f / points;
 
@@ -179,80 +151,22 @@ namespace Engine
 		}
 	}
 
-	void CRender::DrawWave1(Vector loc, float radius, Color color)
+	void CRender::DrawCircle3D(Vector position, float points, float radius, Color color)
 	{
-		static float Step = M_PI * 3.0f / 40;
-		Vector prev;
-		for (float lat = 0; lat <= M_PI * 3.0f; lat += Step)
+		float step = (float)M_PI * 2.0f / points;
+
+		std::vector<Vector> points3d;
+		for (float a = 0; a < (M_PI * 2.0f); a += step)
 		{
-			float sin1 = sin(lat);
-			float cos1 = cos(lat);
-			float sin3 = sin(0.0);
-			float cos3 = cos(0.0);
+			Vector start(radius * cosf(a) + position.x, radius * sinf(a) + position.y, position.z);
+			Vector end(radius * cosf(a + step) + position.x, radius * sinf(a + step) + position.y, position.z);
 
-			Vector point1;
-			point1 = Vector(sin1 * cos3, cos1, sin1 * sin3) * radius;
-			Vector point3 = loc;
-			Vector Out;
-			point3 += point1;
+			Vector start2d, end2d;
+			if (!WorldToScreen(start, start2d) || !WorldToScreen(end, end2d))
+				return;
 
-			if (WorldToScreen(point3, Out))
-			{
-				if (lat > 0.000)
-					DrawLine(prev.x, prev.y, Out.x, Out.y, color);
-			}
-			prev = Out;
+			DrawLine(start2d.x, start2d.y, end2d.x, end2d.y, color);
 		}
-	}
-
-	void CRender::GenuineBox(int x, int y, int w, int h, Color color)
-	{
-		int iw = w / 4;
-		int ih = h / 1;
-		// top
-		DrawLine(x, y, x + iw, y, color);                    // left
-		DrawLine(x + w - iw, y, x + w, y, color);            // right
-		DrawLine(x, y, x, y + ih, color);                    // top left
-		DrawLine(x + w - 1, y, x + w - 1, y + ih, color);    // top right
-															 // bottom
-		DrawLine(x, y + h, x + iw, y + h, color);            // left
-		DrawLine(x + w - iw, y + h, x + w, y + h, color);    // right
-		DrawLine(x, y + h - ih, x, y + h, color);            // bottom left
-		DrawLine(x + w - 1, y + h - ih, x + w - 1, y + h, color);    // bottom right
-	}
-
-	void CRender::GenuineOutlineBox(int x, int y, int w, int h, Color color)
-	{
-		int iw = w / 4;
-		int ih = h / 1.001;
-
-		GenuineBox(x, y, w, h, Color::Black());
-
-		// top left
-		DrawLine(x + 1, y + 1, x + iw, y + 1, color);
-		DrawLine(x + iw, y, x + iw, y + 2, Color::Black());
-		DrawLine(x + 1, y + 1, x + 1, y + ih, color);
-		DrawLine(x, y + ih, x + 2, y + ih, Color::Black());
-
-		// top right
-		DrawLine(x + w - iw, y + 1, x + w - 1, y + 1, color);
-		DrawLine(x + w - iw - 1, y, x + w - iw, y + 2, Color::Black());
-		DrawLine(x + w - 2, y + 1, x + w - 2, y + ih, color);
-		DrawLine(x + w - 2, y + ih, x + w, y + ih, Color::Black());
-
-		// bottom left
-		DrawLine(x + 1, y + h - ih, x + 1, y + h, color);
-		DrawLine(x, y + h - ih - 1, x + 2, y + h - ih - 1, Color::Black());
-		DrawLine(x + 1, y + h - 1, x + iw, y + h - 1, color);
-		DrawLine(x + iw, y + h - 1, x + iw, y + h + 1, Color::Black());
-
-		// bottom right
-		DrawLine(x + w - iw, y + h - 1, x + w - 1, y + h - 1, color);
-		DrawLine(x + w - iw - 1, y + h - 1, x + w - iw, y + h + 1, Color::Black());
-		DrawLine(x + w - 2, y + h - ih, x + w - 2, y + h, color);
-		DrawLine(x + w - 2, y + h - ih - 1, x + w, y + h - ih - 1, Color::Black());
-
-		GenuineBox(x + 2, y + 2, w - 4, h - 4, Color::Black());
 	}
 
 	void CRender::DrawBox(int x, int y, int w, int h, Color color)
@@ -321,6 +235,32 @@ namespace Engine
 		DrawLine(x + w - 1, y + h - ih, x + w - 1, y + h, color);	// bottom right
 	}
 
+	void CRender::DrawWave1(Vector loc, float radius, Color color)
+	{
+		static float Step = M_PI * 3.0f / 40;
+		Vector prev;
+		for (float lat = 0; lat <= M_PI * 3.0f; lat += Step)
+		{
+			float sin1 = sin(lat);
+			float cos1 = cos(lat);
+			float sin3 = sin(0.0);
+			float cos3 = cos(0.0);
+
+			Vector point1;
+			point1 = Vector(sin1 * cos3, cos1, sin1 * sin3) * radius;
+			Vector point3 = loc;
+			Vector Out;
+			point3 += point1;
+
+			if (WorldToScreen(point3, Out))
+			{
+				if (lat > 0.000)
+					DrawLine(prev.x, prev.y, Out.x, Out.y, color);
+			}
+			prev = Out;
+		}
+	}
+
 	void CRender::DrawOutlineCoalBox(int x, int y, int w, int h, Color color)
 	{
 		int iw = w / 4;
@@ -353,6 +293,128 @@ namespace Engine
 		DrawLine(x + w - 2, y + h - ih - 1, x + w, y + h - ih - 1, Color::Black());
 
 		DrawCoalBox(x + 2, y + 2, w - 4, h - 4, Color::Black());
+	}
+
+	void CRender::GenuineBox(int x, int y, int w, int h, Color color)
+	{
+		int iw = w / 4;
+		int ih = h / 1;
+		DrawLine(x, y, x + iw, y, color);                   
+		DrawLine(x + w - iw, y, x + w, y, color);         
+		DrawLine(x, y, x, y + ih, color);                   
+		DrawLine(x + w - 1, y, x + w - 1, y + ih, color); 
+														
+		DrawLine(x, y + h, x + iw, y + h, color);          
+		DrawLine(x + w - iw, y + h, x + w, y + h, color);    
+		DrawLine(x, y + h - ih, x, y + h, color);            
+		DrawLine(x + w - 1, y + h - ih, x + w - 1, y + h, color);  
+	}
+
+	void CRender::GenuineOutlineBox(int x, int y, int w, int h, Color color)
+	{
+		int iw = w / 4;
+		int ih = h / 1.001;
+
+		GenuineBox(x, y, w, h, Color::Black());
+
+		DrawLine(x + 1, y + 1, x + iw, y + 1, color);
+		DrawLine(x + iw, y, x + iw, y + 2, Color::Black());
+		DrawLine(x + 1, y + 1, x + 1, y + ih, color);
+		DrawLine(x, y + ih, x + 2, y + ih, Color::Black());
+
+		DrawLine(x + w - iw, y + 1, x + w - 1, y + 1, color);
+		DrawLine(x + w - iw - 1, y, x + w - iw, y + 2, Color::Black());
+		DrawLine(x + w - 2, y + 1, x + w - 2, y + ih, color);
+		DrawLine(x + w - 2, y + ih, x + w, y + ih, Color::Black());
+
+		DrawLine(x + 1, y + h - ih, x + 1, y + h, color);
+		DrawLine(x, y + h - ih - 1, x + 2, y + h - ih - 1, Color::Black());
+		DrawLine(x + 1, y + h - 1, x + iw, y + h - 1, color);
+		DrawLine(x + iw, y + h - 1, x + iw, y + h + 1, Color::Black());
+
+		DrawLine(x + w - iw, y + h - 1, x + w - 1, y + h - 1, color);
+		DrawLine(x + w - iw - 1, y + h - 1, x + w - iw, y + h + 1, Color::Black());
+		DrawLine(x + w - 2, y + h - ih, x + w - 2, y + h, color);
+		DrawLine(x + w - 2, y + h - ih - 1, x + w, y + h - ih - 1, Color::Black());
+
+		GenuineBox(x + 2, y + 2, w - 4, h - 4, Color::Black());
+	}
+
+	void CRender::DrawOctagonBox(int x, int y, int w, int h, Color color)
+	{
+		int iw = w / 4;
+		int ih = h / 4;
+
+
+		DrawLine(x, y, x + w, y, color);
+		DrawLine((x + w) + iw, y + ih, x + w, y, color); 
+		DrawLine(x - iw, y + ih, x, y, color); 
+											 
+		DrawLine(x - iw, y + h - ih, x - iw, y + ih, color); 
+		DrawLine((x + w) + iw, y + h - ih, x + w + iw, y + ih, color); 
+																	   
+		DrawLine(x, y + h, x + w, y + h, color);
+		DrawLine((x + w) + iw, (y + h) - ih, x + w, y + h, color); 
+		DrawLine(x - iw, (y + h) - ih, x, y + h, color);
+	}
+
+	void CRender::DrawOctagonOutlineBox(int x, int y, int w, int h, Color color)
+	{
+		int iw = w / 4;
+		int ih = h / 4;
+
+		DrawOctagonBox(x, y, w, h, Color::Black());
+
+	}
+
+	void CRender::DrawOctagonCoalBox(int x, int y, int w, int h, Color color)
+	{
+		int iw = w / 4;
+		int ih = h / 4;
+
+		float wh = w + h / 2;
+
+		DrawLine(x, y, x + w, y, color);
+		DrawLine((x + w) + iw, y + ih, x + w, y, color);
+		DrawLine(x - iw, y + ih, x, y, color);
+
+		DrawLine(x, y + h, x + w, y + h, color);
+		DrawLine((x + w) + iw, (y + h) - ih, x + w, y + h, color);
+		DrawLine(x - iw, (y + h) - ih, x, y + h, color);
+	}
+
+	void CRender::DrawAlphaBox(int x, int y, int w, int h, Color color)
+	{
+		DWORD dxFillBoxColor = D3DCOLOR_RGBA(color.r(), color.g(), color.b(), 100);
+
+		D3DTLVERTEX D3DTLV[4] = { 0 };
+
+		CreateVertex(x, y, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 0);
+		CreateVertex(x + w, y, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 1);
+		CreateVertex(x, y + h, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 2);
+		CreateVertex(x + w, y + h, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 3);
+
+		SetVertexState();
+
+		m_pDevice->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, &D3DTLV, sizeof(D3DTLVERTEX));
+	}
+
+	void CRender::DrawOutlineFillBox(int x, int y, int w, int h, Color color)
+	{
+
+		DrawBox(x, y, w, h, Color::Black());
+		DWORD dxFillBoxColor = D3DCOLOR_RGBA(color.r(), color.g(), color.b(), 100);
+
+		D3DTLVERTEX D3DTLV[4] = { 0 };
+
+		CreateVertex(x, y, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 0);
+		CreateVertex(x + w, y, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 1);
+		CreateVertex(x, y + h, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 2);
+		CreateVertex(x + w, y + h, dxFillBoxColor, PD3DTLVERTEX(&D3DTLV), 3);
+
+		SetVertexState();
+
+		m_pDevice->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, &D3DTLV, sizeof(D3DTLVERTEX));
 	}
 
 	void CRender::DrawWindow(int x, int y, int w, int h, Color Border, Color Background)
@@ -535,89 +597,6 @@ namespace Engine
 		SysFreeString(text);
 	}
 
-	int CRender::GetTextHeight(const char* text)
-	{
-		RECT rcRect = { 0,0,0,0 };
-		if (m_pLog)
-			m_pLog->DrawTextA(NULL, text, strlen(text), &rcRect, DT_CALCRECT, D3DCOLOR_XRGB(0, 0, 0));
-		return rcRect.bottom - rcRect.top;
-	}
-
-	void CRender::TextToConsole(int x, int y, bool center, bool shadow, Color color, const char* format, ...)
-	{
-		if (m_pStateBlockText)
-			m_pStateBlockText->Capture();
-
-		m_pDevice->SetFVF(D3DFVF_CUSTOM_TEXT);
-
-		m_pDevice->SetRenderState(D3DRS_LIGHTING, false);
-		m_pDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, true);
-		m_pDevice->SetRenderState(D3DRS_ALPHATESTENABLE, false);
-		m_pDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-		m_pDevice->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-		m_pDevice->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-
-		char Buffer[128] = { '\0' };
-		va_list va_alist;
-		va_start(va_alist, format);
-		vsprintf_s(Buffer, format, va_alist);
-		va_end(va_alist);
-
-		BSTR text = CSX::Utils::ConvertStringToBSTR_UTF8(Buffer);
-
-		DWORD
-			dxTextColor = D3DCOLOR_ARGB(color.a(), color.r(), color.g(), color.b()),
-			shadowColor = D3DCOLOR_ARGB(color.a(), 0, 0, 0);
-
-		auto drawShadow = [&](RECT rect)
-		{
-			rect.left++;
-			m_pLog->DrawTextW(NULL, text, -1, &rect, DT_TOP | DT_LEFT | DT_NOCLIP, shadowColor);
-			rect.top++;
-			m_pLog->DrawTextW(NULL, text, -1, &rect, DT_TOP | DT_LEFT | DT_NOCLIP, shadowColor);
-		};
-
-		if (center)
-		{
-			RECT rec = { 0,0,0,0 };
-
-			m_pLog->DrawTextW(NULL, text, -1, &rec, DT_CALCRECT | DT_NOCLIP, dxTextColor);
-
-			rec =
-			{
-				static_cast<LONG>(x) - rec.right / 2,
-				static_cast<LONG>(y),
-				0,
-				0
-			};
-
-			if (shadow)
-				drawShadow(rec);
-
-			m_pLog->DrawTextW(NULL, text, -1, &rec, DT_TOP | DT_LEFT | DT_NOCLIP, dxTextColor);
-		}
-		else
-		{
-			RECT rec =
-			{
-				static_cast<LONG>(x),
-				static_cast<LONG>(y),
-				0,
-				0
-			};
-
-			if (shadow)
-				drawShadow(rec);
-
-			m_pLog->DrawTextW(NULL, text, -1, &rec, DT_TOP | DT_LEFT | DT_NOCLIP, dxTextColor);
-		}
-
-		if (m_pStateBlockText)
-			m_pStateBlockText->Apply();
-
-		SysFreeString(text);
-	}
-
 	void CRender::SetVertexState()
 	{
 		m_pDevice->SetTexture(0, 0);
@@ -658,174 +637,3 @@ namespace Engine
 		pVertext[index].dxColor = dxColor;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

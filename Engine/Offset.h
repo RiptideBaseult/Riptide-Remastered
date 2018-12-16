@@ -87,6 +87,7 @@ namespace Engine
 			extern DWORD m_iObserverMode;
 			extern DWORD m_hObserverTarget;
 
+			extern DWORD m_nHitboxSet;
 			extern DWORD m_vecOrigin;
 			extern DWORD deadflag;
 
@@ -111,6 +112,7 @@ namespace Engine
 			extern DWORD m_vecViewOffset;
 
 			extern DWORD m_angEyeAngles;
+			extern DWORD m_iWeaponID;
 
 			extern DWORD m_hActiveWeapon;
 
@@ -118,7 +120,7 @@ namespace Engine
 			extern DWORD m_flNextPrimaryAttack;
 			extern DWORD m_bCanReload;
 
-			extern int16 m_iItemDefinitionIndex;
+			extern DWORD m_iItemDefinitionIndex;
 			extern DWORD m_iItemIDHigh;
 			extern DWORD m_iAccountID;
 			extern DWORD m_iEntityQuality;
@@ -141,6 +143,8 @@ namespace Engine
 			extern DWORD m_hGroundEntity;
 			extern DWORD m_nWaterLevel;
 			extern DWORD movetype;
+			extern DWORD m_flFlashBangTime;
+			extern DWORD m_nMoveType;
 			//[/swap_lines]
 		}
 

@@ -18,8 +18,9 @@ namespace Engine
 		bool	IsDead();
 		Vector GetOrigin();
 		Vector * GetVAngles();
+		Vector CBaseEntity::GetBestEyePos(bool bUseGetBonePos);
 		bool	IsVisible(CBaseEntity* pLocalEntity);
-		int		GetMoveType();
+
 		bool	HasHelmet();
 		bool	HasDefuser();
 		int    IsDefusing();
@@ -45,6 +46,7 @@ namespace Engine
 
 		PVOID			GetActiveWeapon();
 		CBaseWeapon*	GetBaseWeapon();
+		bool GetAlive();
 		UINT*			GetWeapons();
 		UINT*			GetWearables();
 		CBaseViewModel* GetViewModel();
@@ -60,6 +62,26 @@ namespace Engine
 
 		Vector	GetBonePosition(int nBone);
 		Vector	GetHitboxPosition(int nHitbox);
+
+		model_t * GetModel2();
+
+		int GetBoneByName(const char * boneName);
+
+		int GetHitboxSet_();
+
+		CBaseWeapon * GetWeapon();
+
+		bool SetupBones2(matrix3x4_t * pBoneToWorldOut, int nMaxBones, int boneMask, float currentTime);
+
+		QAngle * GetEyeAngles2();
+
+		bool * GunGameImmunity();
+
+		float GetFlashBangTime();
+
+		int GetMoveType();
+
+		float & ModulateFlashAlpha();
 
 		studiohdr_t* GetStudioModel();
 

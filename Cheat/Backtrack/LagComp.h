@@ -3,10 +3,6 @@
 
 #define PI 3.14159265358979323846f
 
-#define MAXBACKTRACKTICKS ((int)Settings::Aimbot::aim_Backtracktime)
-#define TICK_INTERVAL	(Interfaces::GlobalVars()->interval_per_tick)
-#define TIME_TO_TICKS( dt )	( (int)( 0.5f + (float)(dt) / TICK_INTERVAL ) )
-
 inline Vector angle_vector(Vector meme)
 {
 	auto sy = sin(meme.y / 180.f * static_cast<float>(PI));
@@ -54,12 +50,7 @@ namespace SDK
 		lbyRecords records[64];
 		bool RunLBYBackTrack(int i, CUserCmd* cmd, Vector& aimPoint);
 		void legitBackTrack(CUserCmd * cmd);
-		void junk5();
 		void Update(int tick_count);
-		void junk1();
-		void junk2();
-		void junk3();
-		void junk4();
 	};
 }
 
